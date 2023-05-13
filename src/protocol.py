@@ -1,79 +1,97 @@
-'''
+"""
     protocol.py
     A few wrappers for network functions for the dechat client and server
-'''
+"""
 
 import socket
+from src.message import Message
 # YOU WILL NEED TO MODIFY THESE FUNCTIONS TO SUIT THE HEADER FORMAT IN THE SPEC
 
 
-def message_send(msg : str, connection, debug=False) -> bytes:
-    '''
+def message_send(message_obj: Message, connection: socket.socket) -> bytes:
+    """
     message_send
     Converts a string message into a collection of bytes
     :: msg :: A string to send
-    '''
-    msg_bytes = msg.encode('ascii')
-    length_bytes = len(msg).to_bytes(2, 'little')
+    """
+    encoding = message_obj.to_bytes()
+    connection.sendall(encoding)
 
-    joined_msg = length_bytes + msg_bytes
+    return encoding
 
-    if debug:
-        print("SENDING: ", joined_msg)
 
-    connection.sendall(joined_msg)
-    return joined_msg
-
-def message_recv(connection, header_length=2, debug=False) -> bytes:
-    '''
+def message_recv(connection, debug=False) -> Message:
+    """
     message_recv
     Waits for a message on the connection and attempts to decode it
     :: connection : socket :: The connection to wait on
-    :: header_length:: The length of the header, defaults to 2
-    '''
-    header = connection.recv(header_length)
-    length = int.from_bytes(header, 'little')
+    """
+    header = connection.recv(38)
+    type_and_length_bytes = connection.recv(2)
 
-    msg =  None
-    if length > 0:
-        msg = connection.recv(length)
+    message_length = Message.decode_type_and_length(type_and_length_bytes)[1]
 
-    if debug:
-        print("RECIEVED:", header, msg)
+    message_bytes = connection.recv(message_length)
 
-    return msg
+    all_bytes = header + type_and_length_bytes + message_bytes
+
+    message_obj = Message.from_bytes(all_bytes)
+
+    return message_obj
 
 
 # You should probably not have to touch these functions
-def bind_socket_setup(hostname : str, port : int, timeout=0.1):
-    '''
+def bind_socket_setup(hostname: str, port: int,
+                      timeout=0.1) -> tuple[bool, socket.socket | None]:
+    """
         Sets up the socket
         :: hostname : str :: hostname to bind to
         :: port : int :: port to bind to
-    '''
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(timeout)
+    
+    successful = False
+
     try:
+        print(f"Trying to bind to {hostname}:{port}")
         sock.bind((hostname, port))
-    except __builtins__.OSerror:
+        successful = True
+    except OSError:
         print("Address already in use")
-        print("Please start the client on a different port, or wait for the address to unbind")
+        print("Please start the client on a different port, or wait for the "
+              "address to unbind")
 
-    sock.listen()
-    return sock
+    if successful:
+        print(f"Hosting on {sock.getsockname()[0]}:{sock.getsockname()[1]}")
 
-def conn_socket_setup(hostname : str, port : int, timeout=0.1):
-    '''
+        sock.listen()
+        return True, sock
+    else:
+        return False, None
+
+
+def conn_socket_setup(hostname: str, port: int, timeout=0.1):
+    """
         Connects to a socket
         :: hostname : str :: hostname to connect to
         :: port : int :: port to connect to
-    '''
+    """
+    print(f"Setting up socket at [{hostname}|{port}]")
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(timeout)
+    successful = False
     try:
         connection.connect((hostname, port))
+        successful = True
     except ConnectionRefusedError:
         print("Connection Refused")
         print(f"It is possible that no server is running at {hostname}:{port}")
         connection = None
-    return connection
+    except OSError as e:
+        print(str(e))
+
+    if successful:
+        return True, connection
+    else:
+        return False, None

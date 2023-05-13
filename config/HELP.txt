@@ -1,0 +1,30 @@
+SERVER COMMANDS:
+
+/list - Displays a list of each of the channels currently on the server
+/join <channel name> [password] - Joins a channel, the password field is optional
+/create <channel name> [password] Creates and joins a new channel by that channelname, 
+the password field is optional
+/info - Shows information about the server. Should print the server name, current number of 
+channel, number of connected users and uptime.
+/invite <nickname> <channel name> - Invites a connected user to a channel
+/motd - Posts the server's message of the day. Contained in the config/MOTD.txt file.
+/rules - Posts the server's rules. Contained in the config/RULES.txt file.
+/help - Shows the server's helpfile. Contained in the config/HELP.txt file.
+
+CHANNEL COMMANDS:
+
+/nick <username> Changes the nickname of the current user in the current channel
+/list Lists users by nickname. Each user should be displayed on a new line.
+/admin <nickname> Returns whether or not the target user is a channel operator. 
+Prints either <nickname> is an operator for channel operators or <nickname> is a regular.
+/msg <nickname> Sends a private message to the target user. The message should 
+take the form <sender_nick> -> <receiver_nick> : <message> This is a special message 
+that cannot be seen by other members of the channel.
+/emote <msg> Posts a message in the third person of the form <nickname> <msg>.
+
+CHANNEL OWNER COMMANDS:
+
+/message_limit <channel name> Changes the message limit of the channel. Defaults
+to 50.
+/pass [password] Sets the password for the channel. If the password field is empty then
+removes the password on the channel.
