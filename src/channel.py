@@ -1,18 +1,20 @@
-from . import utilities
 import socket
 import time
-from .protocol import message_send
-from .message import Message
-from .constants import MAX_NICK_LENGTH, CHANNEL_NICK
+import src.utilities as utilities
+from src.protocol import message_send
+from src.message import Message
+from src.constants import MAX_NICK_LENGTH, CHANNEL_NICK
+
 
 class Channel:
 
     instances = 0
 
-    def __init__(self, creator: socket.socket, name: str, 
-                 password: str = None, colorful: bool = False) -> None:
+    def __init__(self, creator: socket.socket, on_connection_remove: callable,
+                 name: str, password: str = None) -> None:
 
         self.creator = creator
+        self.on_connection_remove = on_connection_remove
         self.name = name
         self.password = password
         self.id = Channel.instances
@@ -24,18 +26,14 @@ class Channel:
         self.connection_nickname_map = {}
         self.nickname_connection_map = {}
 
-
     def get_name(self) -> str:
         return self.name
-
 
     def get_messages(self) -> list:
         return self.messages
 
-
     def set_no_of_messages_saved(self, n: int) -> None:
         self.no_of_messages_saved = n
-
 
     def set_nickname(self, connection: socket.socket, nickname: str) -> str:
         """
@@ -65,7 +63,6 @@ class Channel:
 
         return nickname
 
-
     def add_connection(self, connection: socket.socket, nickname: str, 
                        password: str = "") -> bool:
         """
@@ -84,12 +81,10 @@ class Channel:
 
         return True
 
-
     def welcome(self, connection: socket.socket) -> None:
         nickname = self.connection_nickname_map[connection]
 
         self.announce(f"{nickname} joined the channel")
-
 
     def send_message_history(self, connection: socket.socket,
                              ignore_recent: int = 0) -> None:
@@ -97,12 +92,13 @@ class Channel:
             if i < len(self.messages) - ignore_recent:
                 message_send(msg, connection)
 
-
     def get_connections(self) -> set[socket.socket]:
         return self.connections
 
-
     def remove_connection(self, connection: socket.socket) -> None:
+
+        self.on_connection_remove(connection)
+
         self.connections.remove(connection)
 
         if connection in self.connection_nickname_map:
@@ -113,7 +109,6 @@ class Channel:
             
             del self.connection_nickname_map[connection]
 
-
     def broadcast_message(self, message_obj: Message):
         self.messages.insert(0, message_obj)
 
@@ -123,11 +118,9 @@ class Channel:
         for conn in self.connections:
             message_send(message_obj, conn)
 
-
     def announce(self, s: str) -> None:
         message_obj = Message(self.id, "*", time.time(), 0b00, s)
         self.broadcast_message(message_obj)
-
 
     def handle_user_message(self, connection: socket.socket,
                             message_obj: Message) -> None:
@@ -145,7 +138,6 @@ class Channel:
         )
 
         message_send(message_obj, conn)
-
 
     def handle_command_input(self, connection: socket.socket,
                              message_obj: Message) -> bool:
@@ -174,9 +166,8 @@ class Channel:
 
                 case "list":
 
-                    def nick_extractor(c: socket.socket) -> None:
+                    def nick_extractor(c: socket.socket) -> str:
                         return self.connection_nickname_map[c]
-
 
                     echo = "\n".join(map(nick_extractor, self.connections))
 
@@ -215,13 +206,13 @@ class Channel:
 
                             echo += " is a regular"
 
-                    self.echo_conn(echo)
+                        self.echo_conn(connection, echo)
 
                 case "message_limit":
 
                     if (len(splits) >= 2 and 
-                        utilities.is_integer(splits[1]) and
-                        self.creator == connection):
+                            utilities.is_integer(splits[1]) and
+                            self.creator == connection):
 
                         message_limit = int(splits[1])
 
@@ -244,10 +235,10 @@ class Channel:
 
                         self.password = password
 
-
                 case "msg":
                     
                     target_conn = None
+                    target_name = ""
 
                     if len(splits) >= 3:
 
@@ -256,7 +247,7 @@ class Channel:
                             target_name, None
                         )
 
-                    if target_conn != None:
+                    if target_conn is not None:
 
                         message = message_obj.message.split(" ", 2)[2]
 
@@ -269,6 +260,22 @@ class Channel:
 
                         message_send(message_obj, connection)
                         message_send(message_obj, target_conn)
+
+                case "quit":
+                    
+                    quit_message = ""
+
+                    if len(splits) >= 2:
+                        quit_message = message_obj.message.split(" ", 1)[1]
+
+                    nick = self.connection_nickname_map[connection]
+
+                    if quit_message != "":
+                        self.announce(f"{nick} has quit ({quit_message})")
+                    else:
+                        self.announce(f"{nick} has quit")
+
+                    self.remove_connection(connection)
                     
                 case _:
                     valid_command = False

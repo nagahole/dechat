@@ -1,6 +1,7 @@
 import sys
 import time
 
+
 def is_integer(s: str) -> bool:
     if s[0] == "-":
         s = s[1:]
@@ -47,12 +48,3 @@ def clear_lines(n: int) -> None:
 
 def unix_to_str(unix_time: int) -> str:
     return f"[{time.strftime('%H:%M:%S', time.localtime(unix_time))}]"
-
-
-def reverse_bits(n, no_of_bits):
-    result = 0
-    for i in range(no_of_bits):
-        result <<= 1
-        result |= n & 1
-        n >>= 1
-    return result

@@ -1,5 +1,4 @@
 import os
-import sys
 import socket
 import time
 import src.utilities as utilities
@@ -11,10 +10,12 @@ from src.constants import SERVER_CHANNEL_ID, CONFIG_FOLDER
 
 PROJECT_PATH = os.getcwd()
 
+
 class ServerCommandArgs:
     def __init__(self, message_obj: Message, created_timestamp: float, 
                  conns: list[socket.socket], channels: AliasDictionary, 
                  connection_channel_map: dict[socket.socket, Channel],
+                 nickname_connection_map: dict[str, socket.socket],
                  hostname: str, port: int):
 
         self.message_obj = message_obj
@@ -22,8 +23,10 @@ class ServerCommandArgs:
         self.conns = conns
         self.channels = channels
         self.connection_channel_map = connection_channel_map
+        self.nickname_connection_map = nickname_connection_map
         self.hostname = hostname
         self.port = port
+
 
 def c_motd(conn: socket.socket, args: ServerCommandArgs) -> None:
     file_path = f"{PROJECT_PATH}/{CONFIG_FOLDER}/MOTD.txt"
@@ -47,6 +50,7 @@ def c_help(conn: socket.socket, args: ServerCommandArgs) -> None:
             
             echo_conn(conn, file.read())
 
+
 def c_rules(conn: socket.socket, args: ServerCommandArgs) -> None:
     file_path = f"{PROJECT_PATH}/{CONFIG_FOLDER}/RULES.txt"
     file_exists = os.path.isfile(file_path)
@@ -55,6 +59,7 @@ def c_rules(conn: socket.socket, args: ServerCommandArgs) -> None:
         with open(file_path) as file:
 
             echo_conn(conn, file.read())
+
 
 def c_info(conn: socket.socket, args: ServerCommandArgs) -> None:
     uptime = time.time() - args.created_timestamp
@@ -73,15 +78,22 @@ def c_info(conn: socket.socket, args: ServerCommandArgs) -> None:
 
     echo_conn(conn, echo)
 
+
 def c_list(conn: socket.socket, args: ServerCommandArgs) -> None:
 
     all_channels = args.channels.values()
 
-    channels_string = ", ".join(
+    if len(all_channels) == 0:
+        echo_conn(conn, "No channels in server")
+        return
+
+    channels_string = "Channels:\n"
+    channels_string += ", ".join(
         map(lambda c: c.get_name(), all_channels)
     )
 
     echo_conn(conn, channels_string)
+
 
 def c_create(conn: socket.socket, args: ServerCommandArgs) -> None:
     splits = args.message_obj.message.split(" ")
@@ -100,7 +112,11 @@ def c_create(conn: socket.socket, args: ServerCommandArgs) -> None:
     if len(splits) >= 3:
         password = splits[2]
 
-    channel = Channel(conn, channel_name, password)
+    def on_connection_removed(n_conn: socket.socket) -> None:
+        del args.connection_channel_map[n_conn]
+        print(f"Removing connection from channel")
+
+    channel = Channel(conn, on_connection_removed, channel_name, password)
 
     args.channels[channel.id, channel_name] = channel
 
@@ -111,6 +127,7 @@ def c_create(conn: socket.socket, args: ServerCommandArgs) -> None:
     channel.send_message_history(conn)
     channel.welcome(conn)
 
+
 def c_join(conn: socket.socket, args: ServerCommandArgs) -> None:
     splits = args.message_obj.message.split(" ")
     splits = list(filter(lambda s: s != "", splits))
@@ -120,7 +137,7 @@ def c_join(conn: socket.socket, args: ServerCommandArgs) -> None:
 
     channel_name = splits[1]
     
-    if channel_name not in args.channels: # Channel doesn't exist
+    if channel_name not in args.channels:  # Channel doesn't exist
         return
 
     channel = args.channels[channel_name]
@@ -143,12 +160,37 @@ def c_join(conn: socket.socket, args: ServerCommandArgs) -> None:
         channel.welcome(conn)
 
 
+def c_invite(conn: socket.socket, args: ServerCommandArgs) -> None:
+    splits = args.message_obj.message.split(" ")
+    splits = list(filter(lambda s: s != "", splits))
+
+    if len(splits) < 3:
+        return
+
+    target_nick = splits[1]
+    channel_name = splits[2]
+
+    if target_nick not in args.nickname_connection_map:
+        echo_conn(conn, f"{target_nick} doesn't exist")
+        return
+
+    if channel_name not in args.channels:
+        echo_conn(conn, f"{channel_name} doesn't exist")
+        return
+    
+    target_conn = args.nickname_connection_map[target_nick]
+    channel = args.channels[channel_name]
+
+    echo_conn(target_conn, f"You've been invited to {channel.name}")
+
+
 def echo_conn(conn: socket.socket, message: str) -> None:
 
-    message_obj = Message(SERVER_CHANNEL_ID, "server -> You", time.time(),
+    message_obj = Message(SERVER_CHANNEL_ID, "", time.time(),
                           0b01, message)
 
     message_send(message_obj, conn)
+
 
 def leave_old_channel(conn: socket.socket, args: ServerCommandArgs) -> None:
 
@@ -182,5 +224,6 @@ server_command_map = {
     "info": c_info,
     "list": c_list,
     "create": c_create,
-    "join": c_join
+    "join": c_join,
+    "invite": c_invite
 }

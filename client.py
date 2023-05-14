@@ -21,100 +21,113 @@ def main():
     Entrypoint for the client
     """
 
-    connection = None
-    quitted = False  # I know it's not a word but quit is a keyword
-
-    default_nickname = "anonymous"
+    quitted = False
+    default_nickname = "anon"
     
-    while connection is None and not quitted:
-        user_input = input(INPUT_PROMPT)
+    while not quitted:
 
-        utilities.clear_line()
+        connection = None
+    
+        while connection is None and not quitted:
+            user_input = input(INPUT_PROMPT)
 
-        splits = user_input.split(" ")
-        splits = list(filter(lambda s: s != "", splits))
+            utilities.clear_line()
 
-        if len(splits) != 0 and splits[0] != "" and splits[0][0] == "/":
-            
-            command = splits[0][1:].lower()
+            splits = user_input.split(" ")
+            splits = list(filter(lambda s: s != "", splits))
 
-            match command:
-                case "c":
-                    successful, connection = conn_socket_setup("localhost", 9996)
-                case "connect":
-                    
-                    errored = False
+            if len(splits) != 0 and splits[0] != "" and splits[0][0] == "/":
+                
+                command = splits[0][1:].lower()
 
-                    if len(splits) < 2:
-                        errored = True
-                    else:
-                        host_port = splits[1].split(":")
-
-                    if not errored and len(host_port) >= 2:
-
-                        hostname = ":".join(host_port[0: -1])
-
-                        if utilities.is_integer(host_port[-1]):
-                            port = int(host_port[-1])
-
-                            if not 0 <= port <= MAX_PORT_VALUE:
-                                errored = True
-
-                        else:
-                            errored = True
-
-                    else: 
-                        errored = True
-
-                    if not errored:
-                        print("Connecting to server...")
+                match command:
+                    case "c":
                         successful, connection = conn_socket_setup(
-                            hostname, port
+                            "localhost", 9996
                         )
 
-                        if not successful:
-                            print("Failed to connect to server")
+                    case "connect":
+                        
+                        errored = False
+                        host_port = ""
+                        hostname = ""
+                        port = -1
 
-                case "quit":
-                    quitted = True
-
-                case "nick":
-                    if len(splits) >= 2:
-                        new_nick = splits[1]
-
-                        if len(new_nick) > MAX_NICK_LENGTH:
-                            print("Maximum nickname length is 15")
+                        if len(splits) < 2:
+                            errored = True
                         else:
-                            default_nickname = new_nick
-                            print("Default nickname set to {default_nickname}")
+                            host_port = splits[1].split(":")
 
-                case unrecognized_command:
-                    print(f"Command \"{unrecognized_command}\" not recognized")
+                        if not errored and len(host_port) >= 2:
 
-    if not quitted:
+                            hostname = ":".join(host_port[0: -1])
 
-        # Second argument is the last nickname that messaged
-        state = [[True], [None]]
+                            if utilities.is_integer(host_port[-1]):
+                                port = int(host_port[-1])
 
-        # Start the listener, don"t worry about this bit unless 
-        # you need multiple connections from one client
-        listener = threading.Thread(
-            target=client_listener,
-            args=(connection, state),
-            kwargs={"tickrate": 8})
-        listener.start()
+                                if not 0 <= port <= MAX_PORT_VALUE:
+                                    errored = True
 
-        # Start the sender
-        client_sender(connection, default_nickname, state)
+                            else:
+                                errored = True
 
-        # Stop the listener
-        state[0][0] = False
+                        else: 
+                            errored = True
 
-        # Close the listener thread
-        listener.join()
+                        if not errored:
+                            print("Connecting to server...")
+                            successful, connection = conn_socket_setup(
+                                hostname, port
+                            )
 
-        # Close the connection
-        connection.close()
+                            if not successful:
+                                print("Failed to connect to server")
+
+                    case "quit":
+                        quitted = True
+
+                    case "nick":
+                        if len(splits) >= 2:
+                            new_nick = splits[1]
+
+                            if len(new_nick) > MAX_NICK_LENGTH:
+                                print("Maximum nickname length is 15")
+                            else:
+                                default_nickname = new_nick
+                                print(
+                                    f"Default nickname set to {new_nick}"
+                                )
+
+                    case unrecognized_command:
+                        print(
+                            f'Command "{unrecognized_command}" not recognized'
+                        )
+
+        if connection and not quitted:
+
+            # Second argument is the last nickname that messaged
+            # Third argument is whether user is in a channel
+            state = [[True], [None], [False]]
+
+            # Start the listener, don"t worry about this bit unless 
+            # you need multiple connections from one client
+            listener = threading.Thread(
+                target=client_listener,
+                args=(connection, state),
+                kwargs={"tickrate": 8})
+            listener.start()
+
+            # Start the sender
+            client_sender(connection, default_nickname, state)
+
+            # Stop the listener
+            state[0][0] = False
+
+            # Close the listener thread
+            listener.join()
+
+            # Close the connection
+            connection.close()
 
     return
 
@@ -127,9 +140,11 @@ def client_sender(connection: socket.socket, default_nickname: str,
         :: connection :: Socket connection
     """
 
+    quitted = False
+
     # Close the connection on an empty message
 
-    while len((user_input := input(INPUT_PROMPT))) > 0:
+    while not quitted and len((user_input := input(INPUT_PROMPT))) > 0:
         
         utilities.clear_line()
 
@@ -152,6 +167,7 @@ def client_sender(connection: socket.socket, default_nickname: str,
                         print("Usage: /reply <message>")
                         message_obj = None
                     else:
+
                         last_whisperer = state[1][0]
 
                         if not last_whisperer:
@@ -166,18 +182,20 @@ def client_sender(connection: socket.socket, default_nickname: str,
                             )
 
                 case "quit":
-                    pass
-                    # quit_message = None
-                    #
-                    # if len(splits) > 1:
-                    #     quit_message = user_input.split(" ", 1)[1]
+                    in_channel = state[2][0]
+
+                    if not in_channel:
+                        print("Disconnecting from server...")
+                        quitted = True
+                        message_obj = None
+                    else:  # Is in channel and quitting the channel
+                        state[2][0] = False
 
         if message_obj:
             message_send(message_obj, connection)
 
     # Send an empty message to close the connection
     # You may want something more sophisticated
-
     message_send(Message(0, "", time.time(), 0b00, ""), connection) 
     return
 
@@ -194,6 +212,7 @@ def client_listener(connection, state, tickrate=0.5):
     # A class would be much better here, you might want to consider it
     print("Listening!", id(state[0]))
     while state[0][0] is True:
+
         try:
             
             # While message_obj isn't None
@@ -202,6 +221,7 @@ def client_listener(connection, state, tickrate=0.5):
 
         except socket.timeout:
             continue
+
         time.sleep(1/tickrate)
     return
 
@@ -212,11 +232,18 @@ def handle_message_received(obj: Message, state: list) -> None:
 
     match obj.message_type:
         case 0b00:  # Channel posts
-            
-            if "->" in obj.nickname: # Is a message
-                state[1][0] = obj.nickname.split("->")[0].strip()
 
-            nickname = obj.nickname.rjust(30).ljust(32)
+            # Client is in a channel
+            if "has quit" not in obj.message:
+                state[2][0] = True
+
+            message_separator = NICK_MSG_SEPARATOR
+            
+            if "->" in obj.nickname:  # Is a message
+                state[1][0] = obj.nickname.split("->")[0].strip()
+                message_separator = ":"
+
+            nickname = obj.nickname.rjust(32)
 
             lines = obj.message.split("\n")
 
@@ -225,14 +252,14 @@ def handle_message_received(obj: Message, state: list) -> None:
             for i, line in enumerate(lines):
                 if i != 0:
                     echo += "\n"
-                    echo += " " * 42
-                    echo += NICK_MSG_SEPARATOR
+                    echo += " " * 40
+                    echo += message_separator
                     echo += f" {line}"
 
             echo = "".join([
                 time_string,
                 nickname,
-                NICK_MSG_SEPARATOR,
+                message_separator,
                 f" {echo}"
             ])
             
@@ -245,5 +272,6 @@ def handle_message_received(obj: Message, state: list) -> None:
                 print("\r" + obj.message, end="")
                 sys.stdout.flush()
                 print(f"\n{INPUT_PROMPT}", end="")
+
 
 main()

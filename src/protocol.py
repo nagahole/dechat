@@ -20,7 +20,7 @@ def message_send(message_obj: Message, connection: socket.socket) -> bytes:
     return encoding
 
 
-def message_recv(connection, debug=False) -> Message:
+def message_recv(connection) -> Message:
     """
     message_recv
     Waits for a message on the connection and attempts to decode it

@@ -1,5 +1,6 @@
 import src.utilities as utilities
 
+
 class Message:
     """
     Wrapper class to make encoding and decoding bytes easier
@@ -17,7 +18,7 @@ class Message:
         Returns None if passed in bytes is invalid
         """
         if len(b) < 40:
-            return None
+            return Message()
 
         channel_id = int.from_bytes(b[:2], "little")
         nickname = b[2:34].decode("ascii").strip()
@@ -39,10 +40,6 @@ class Message:
 
         # Type bits have to be on the right because when encoded to
         # little endianness it will become the first 2 bits
-
-        message_type = utilities.reverse_bits(message_type, 2)
-        message_length = utilities.reverse_bits(message_length, 14)
-
         type_bits = 0b11 & message_type
         length_bits = ((0xffff >> 2) & message_length) << 2
 
@@ -54,9 +51,6 @@ class Message:
 
         message_type = 0b11 & encoded_int
         message_length = ((0xffff << 2) & encoded_int) >> 2
-
-        message_type = utilities.reverse_bits(message_type, 2)
-        message_length = utilities.reverse_bits(message_length, 14)
 
         return message_type, message_length
 
@@ -125,4 +119,3 @@ class Message:
         self.set_timestamp(timestamp)
         self.set_message_type(message_type)
         self.set_message(message)
-

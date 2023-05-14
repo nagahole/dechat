@@ -6,18 +6,21 @@
 import socket
 import time
 import sys
+import os
 import src.utilities as utilities
 from src.protocol import message_send, message_recv, bind_socket_setup
 from src.message import Message
 from src.channel import Channel
 from src.alias_dictionary import AliasDictionary
 from src.server_commands import ServerCommandArgs, server_command_map
+from src.constants import CONFIG_FOLDER, SERVER_CHANNEL_ID
 
 # A better solution to this would be to poll rather than try and except
 # But due to Windows compatibility issues Python's socket object does not
 # support native polling. As a result we will be emulating a non-blocking
 # stream using exceptions. This implementation is hopefully also easier to
 # understand.
+
 
 def main():
     """
@@ -36,6 +39,7 @@ def main():
             port = int(sys.argv[2])
 
     run_server(host, port, tickrate)
+
 
 def run_server(hostname="localhost", port=9996, tickrate=1):
     """
@@ -59,6 +63,8 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
     # To help remove users from previous channels when they join a new one
     connection_channel_map = {}
 
+    nickname_connection_map = {}
+
     # Loop server, you will want a better exit condition
     while True:
         prev = time.time()
@@ -67,7 +73,21 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
             connection, addr = sock.accept()
             connection.settimeout(0.1)
             conns.append(connection)
+
             print(f"New Connection! {addr}")
+
+            file_path = f"{CONFIG_FOLDER}/MOTD.txt"
+            file_exists = os.path.isfile(file_path)
+
+            if file_exists:
+                with open(file_path) as file:
+
+                    message_obj = Message(
+                        SERVER_CHANNEL_ID, "", time.time(), 0b01, file.read()
+                    )
+
+                    message_send(message_obj, connection)
+
         except socket.timeout:
             pass
 
@@ -112,6 +132,9 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                         channel.remove_connection(conn)
                         del connection_channel_map[conn]
 
+                    if message_obj.nickname in nickname_connection_map:
+                        del nickname_connection_map[message_obj.nickname]
+
                     conn.close()
                     i -= 1
 
@@ -120,6 +143,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
             if response_received and not connection_closed:
 
                 conn = conns[i]
+                nickname_connection_map[message_obj.nickname] = conn
 
                 is_command = msg != "" and msg[0] == "/"
 
@@ -146,6 +170,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                             conns,
                             channels,
                             connection_channel_map,
+                            nickname_connection_map,
                             hostname,
                             port
                         )
