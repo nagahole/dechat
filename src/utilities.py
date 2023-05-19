@@ -1,4 +1,3 @@
-import sys
 import time
 
 
@@ -37,14 +36,9 @@ def format_time_period(seconds: float):
     return res
 
 
-def clear_line() -> None:
-    sys.stdout.write('\033[1A\033[K')
-
-
-def clear_lines(n: int) -> None:
-    for i in range(n):
-        clear_line()
-
-
 def unix_to_str(unix_time: int) -> str:
     return f"[{time.strftime('%H:%M:%S', time.localtime(unix_time))}]"
+
+
+def smart_split(s: str) -> list[str]:
+    return list(filter(lambda s: s != "", s.split()))

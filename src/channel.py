@@ -73,7 +73,10 @@ class Channel:
         """
 
         # Password exists and it doesn't match
-        if self.password and self.password != password:
+        is_not_owner = connection != self.creator
+        invalid_password = self.password and self.password != password
+
+        if is_not_owner and invalid_password:
             return False
 
         self.connections.add(connection)
@@ -112,8 +115,8 @@ class Channel:
     def broadcast_message(self, message_obj: Message):
         self.messages.insert(0, message_obj)
 
-        while len(self.messages) > self.no_of_messages_saved:
-            self.messages.pop()
+        if len(self.messages) > self.no_of_messages_saved:
+            self.messages = self.messages[:self.no_of_messages_saved]
 
         for conn in self.connections:
             message_send(message_obj, conn)

@@ -1,14 +1,12 @@
 # Idea by https://discuss.python.org/t/syntax-for-aliases-to-keys-of-python-dictionaries/14992
-class AliasDictionary(dict):
+class AliasDictionary:
     """
     To solve the problem of the user needing to be able to 
     access a channel by its name and the protocol needing to be 
     able to access a channel by its id
-
-    Only supports one alias :(
     """
     def __init__(self, *args, **kwargs):
-        dict.__init__(self, *args, **kwargs)
+        self.dict = dict(*args, **kwargs)
         self.aliases = {}
 
     def __getitem__(self, key):
@@ -17,20 +15,17 @@ class AliasDictionary(dict):
         # will try to access the base dictionary with just the given key
         key = self.aliases.get(key, key) 
 
-        return dict.__getitem__(self, key)
+        if key in self.dict:
+            return self.dict[key]
+
+        raise KeyError(f"{key} not found")
 
     def __setitem__(self, key, value):
-        if type(key) == tuple:
-            alias = key[1]
-            self.aliases[alias] = key[0]
+        # Will get the key an alias points to if exists, otherwise
+        # will try to access the base dictionary with just the given key
+        key = self.aliases.get(key, key)
 
-            return dict.__setitem__(self, key[0], value)
-        else:
-            # Will get the key an alias points to if exists, otherwise
-            # will try to access the base dictionary with just the given key
-            key = self.aliases.get(key, key)
-
-            return dict.__setitem__(self, key, value)
+        self.dict[key] = value
 
     def __iter__(self):
         """
@@ -44,13 +39,19 @@ class AliasDictionary(dict):
         # python dictionaries uses a dict_keyiterator under the hood,
         # but it works
         alias_keys = self.aliases.keys()
-        all_keys = list(dict.keys(self))
+        all_keys = list(self.dict.keys())
         all_keys.extend(alias_keys)
 
         return iter(all_keys)
 
     def __contains__(self, key):
-        return key in self.aliases or dict.__contains__(self, key)
+        return key in self.aliases or key in self.dict
+
+    def __len__(self):
+        return len(self.dict)
+
+    def values(self):
+        return self.dict.values()
 
     def add_alias(self, key, alias):
         self.aliases[alias] = key

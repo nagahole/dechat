@@ -6,14 +6,11 @@
 import socket
 import time
 import sys
-import os
 import src.utilities as utilities
-from src.protocol import message_send, message_recv, bind_socket_setup
 from src.message import Message
-from src.channel import Channel
-from src.alias_dictionary import AliasDictionary
-from src.server_commands import ServerCommandArgs, server_command_map
-from src.constants import CONFIG_FOLDER, SERVER_CHANNEL_ID
+from src.protocol import message_recv, bind_socket_setup
+from src.commons import ServerVariables
+from src.commands.server_commands import server_command_map, echo_conn
 
 # A better solution to this would be to poll rather than try and except
 # But due to Windows compatibility issues Python's socket object does not
@@ -56,53 +53,33 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
         print("Server setup not successful, please try again")
         return
 
-    created_timestamp = time.time()
-    conns = []
-    channels = AliasDictionary()
+    s_vars = ServerVariables(hostname, port)
 
-    # To help remove users from previous channels when they join a new one
-    connection_channel_map = {}
+    while not s_vars.quitted:
 
-    nickname_connection_map = {}
-
-    # Loop server, you will want a better exit condition
-    while True:
         prev = time.time()
 
         try:  # Check for a new connection
             connection, addr = sock.accept()
             connection.settimeout(0.1)
-            conns.append(connection)
+            s_vars.conns.append(connection)
+
+            server_command_map["motd"](Message(), connection, s_vars)
 
             print(f"New Connection! {addr}")
-
-            file_path = f"{CONFIG_FOLDER}/MOTD.txt"
-            file_exists = os.path.isfile(file_path)
-
-            if file_exists:
-                with open(file_path) as file:
-
-                    message_obj = Message(
-                        SERVER_CHANNEL_ID, "", time.time(), 0b01, file.read()
-                    )
-
-                    message_send(message_obj, connection)
 
         except socket.timeout:
             pass
 
         # Check currently connected sessions
         i = 0
-        while i < len(conns):
-            
-            response_received = False
+        while i < len(s_vars.conns):
+
+            message_obj = None
 
             try:  # Check if any data has been passed in and print it
 
-                message_obj = message_recv(conns[i])
-
-                if message_obj is not None:
-                    response_received = True
+                message_obj = message_recv(s_vars.conns[i])
 
                 print(f"Message received from {i}")
 
@@ -111,12 +88,12 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                 pass
             except ConnectionResetError:
                 print(f"Connection {i} unexpectedly got reset")
-                conns.pop(i)
+                s_vars.conns.pop(i)
                 i -= 1
 
             connection_closed = False
 
-            if response_received:
+            if message_obj is not None:
 
                 msg = message_obj.message
 
@@ -125,31 +102,31 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
                     print("Closing user " + str(i))
 
-                    conn = conns.pop(i)
+                    conn = s_vars.conns.pop(i)
 
-                    if conn in connection_channel_map:
-                        channel = connection_channel_map[conn]
+                    if conn in s_vars.conn_channel_map:
+                        channel = s_vars.conn_channel_map[conn]
                         channel.remove_connection(conn)
-                        del connection_channel_map[conn]
+                        del s_vars.conn_channel_map[conn]
 
-                    if message_obj.nickname in nickname_connection_map:
-                        del nickname_connection_map[message_obj.nickname]
+                    if message_obj.nickname in s_vars.nick_conn_map:
+                        del s_vars.nick_conn_map[message_obj.nickname]
 
                     conn.close()
                     i -= 1
 
                     connection_closed = True
                     
-            if response_received and not connection_closed:
+            if message_obj is not None and not connection_closed:
 
-                conn = conns[i]
-                nickname_connection_map[message_obj.nickname] = conn
+                conn = s_vars.conns[i]
+                s_vars.nick_conn_map[message_obj.nickname] = conn
 
-                is_command = msg != "" and msg[0] == "/"
+                is_command = msg and msg[0] == "/"
 
-                if conn in connection_channel_map:
+                if conn in s_vars.conn_channel_map:
 
-                    channel = connection_channel_map[conn]
+                    channel = s_vars.conn_channel_map[conn]
 
                     if is_command:
                         channel.handle_command_input(conn, message_obj)
@@ -164,20 +141,13 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
                     if command in server_command_map:
 
-                        args = ServerCommandArgs(
-                            message_obj,
-                            created_timestamp,
-                            conns,
-                            channels,
-                            connection_channel_map,
-                            nickname_connection_map,
-                            hostname,
-                            port
-                        )
-
                         func = server_command_map[command]
 
-                        func(conn, args)
+                        func(message_obj, conn, s_vars)
+                    
+                    else:
+
+                        echo_conn(conn, "Command not recognized")
 
             i += 1
 

@@ -77,7 +77,7 @@ def conn_socket_setup(hostname: str, port: int, timeout=0.1):
         :: hostname : str :: hostname to connect to
         :: port : int :: port to connect to
     """
-    print(f"Setting up socket at [{hostname}|{port}]")
+    print(f"Setting up socket at {hostname}:{port}")
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(timeout)
     successful = False

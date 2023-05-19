@@ -1,4 +1,5 @@
 import src.utilities as utilities
+from src.constants import NICK_MSG_SEPARATOR, MAX_NICK_LENGTH
 
 
 class Message:
@@ -21,7 +22,7 @@ class Message:
             return Message()
 
         channel_id = int.from_bytes(b[:2], "little")
-        nickname = b[2:34].decode("ascii").strip()
+        nickname = b[2:34].decode("ascii").strip("\x00")
         timestamp = int.from_bytes(b[34:38], "little")
 
         message_type, message_length = Message.decode_type_and_length(b[38:40])
@@ -79,7 +80,7 @@ class Message:
         encoding = b""
 
         encoding += self.channel_id.to_bytes(2, "little")
-        encoding += self.nickname.rjust(32).encode("ascii")
+        encoding += self.nickname.rjust(32, "\x00").encode("ascii")
         encoding += self.timestamp.to_bytes(4, "little")
         encoding += type_and_length
         encoding += self.message.encode("ascii")
@@ -119,3 +120,34 @@ class Message:
         self.set_timestamp(timestamp)
         self.set_message_type(message_type)
         self.set_message(message)
+
+    def format(self) -> str:
+
+        time_string = utilities.unix_to_str(self.timestamp)
+
+        message_separator = NICK_MSG_SEPARATOR
+            
+        if "->" in self.nickname:  # Is a message
+            message_separator = ":"
+
+        if self.message_type == 0b01:
+            nickname = "*"
+        else:
+            nickname = self.nickname
+
+        nickname = nickname.rjust(MAX_NICK_LENGTH * 2 + 2)
+
+        lines = self.message.split("\n")
+
+        echo = lines[0]
+
+        for i, line in enumerate(lines):
+            if i != 0:
+                echo += "\n"
+                echo += " " * ((MAX_NICK_LENGTH * 2 + 2) + 10)
+                echo += message_separator
+                echo += f" {line}"
+
+        return f"{time_string}{nickname}{message_separator} {echo}"
+
+
