@@ -33,7 +33,7 @@ class Client:
     """
     Client class
     """
-    def __init__(self, ui_enabled: bool=False) -> None:
+    def __init__(self, ui_enabled: bool = False) -> None:
         self.quitted = False
         self.default_nickname = "anon"
         self.ui_enabled = ui_enabled
@@ -86,8 +86,8 @@ class Client:
         self.con_wrappers[num] = wrapper
         return num
 
-    def change_display(self, num: int, clear_terminal: bool=True,
-                       ping_for_info: bool=False) -> None:
+    def change_display(self, num: int, clear_terminal: bool = True,
+                       ping_for_info: bool = False) -> None:
         """
         Changes to the display specified by its num
         """
@@ -101,8 +101,8 @@ class Client:
             raise KeyError(f"Display {num} doesn't exist!")
 
     def activate_wrapper(self, wrapper: ClientConnectionWrapper,
-                         clear_terminal: bool=True,
-                         ping_for_info: bool=False) -> None:
+                         clear_terminal: bool = True,
+                         ping_for_info: bool = False) -> None:
         """
         Activates a wrapper, setting up client listeners and client senders
         for that wrapper
@@ -203,9 +203,8 @@ class Client:
         while (self.exists_cons() and
                self.current_wrapper is None and
                not self.quitted):
-            # Quit a server but it's multicon and connected to others
+            # Quit a server, but it's multicon and connected to others
             self.take_user_input(limbo_command_map)
-
 
     def client_sender(self, wrapper: ClientConnectionWrapper) -> None:
         """
@@ -255,8 +254,7 @@ class Client:
 
                         func(user_input, self, wrapper)
 
-                    if (self.ui_enabled and
-                        (command == "join" or command == "create")):
+                    if self.ui_enabled and command in ("join", "create"):
 
                         wrapper.states.joining_channel = True
                         if len(splits) >= 2:
@@ -268,16 +266,14 @@ class Client:
             else:
                 empty_message = True
 
-
-        if not len(user_input) > 0 and not wrapper.closed:
+        if empty_message and not wrapper.closed:
 
             message_send(CLOSE_MESSAGE, wrapper.connection)
 
             wrapper.close()
 
-
     def client_listener(self, wrapper: ClientConnectionWrapper,
-                        tickrate: float=0.5) -> None:
+                        tickrate: float = 0.5) -> None:
         """
         This function will listen and print in parallel with the main program.
         Use the wrapper variable to share state where needed.
@@ -298,10 +294,9 @@ class Client:
 
             time.sleep(1/tickrate)
 
-
     def process_received_message(self, message: Message,
                                  wrapper: ClientConnectionWrapper,
-                                 real_message: bool=True) -> None:
+                                 real_message: bool = True) -> None:
         """
         Prints received messages accordingly
         """

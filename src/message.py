@@ -1,5 +1,8 @@
-import time
-import src.utilities as utilities
+"""
+Wrapper class for the message protocol. Intended to make life easier
+"""
+
+from src import utilities
 from src.constants import NICK_MSG_SEPARATOR, MAX_NICK_LENGTH
 
 
@@ -9,7 +12,7 @@ class Message:
     """
 
     @staticmethod
-    def from_bytes(b: bytes) -> "Message":
+    def from_bytes(message_bytes: bytes) -> "Message":
         """
         - 2 byte channel ID
         - 32 byte nickname
@@ -19,16 +22,16 @@ class Message:
 
         Returns None if passed in bytes is invalid
         """
-        if len(b) < 40:
-            None
+        if len(message_bytes) < 40:
+            return None
 
-        channel_id = int.from_bytes(b[:2], "little")
-        nickname = b[2:34].decode("ascii").strip("\x00")
-        timestamp = int.from_bytes(b[34:38], "little")
+        channel_id = int.from_bytes(message_bytes[:2], "little")
+        nickname = message_bytes[2:34].decode("ascii").strip("\x00")
+        timestamp = int.from_bytes(message_bytes[34:38], "little")
 
-        message_type, message_length = Message.decode_type_and_length(b[38:40])
+        message_type, message_length = Message.decode_type_and_length(message_bytes[38:40])
 
-        message = b[40:40 + message_length].decode("ascii")
+        message = message_bytes[40:40 + message_length].decode("ascii")
 
         message_obj = Message(channel_id, nickname, timestamp,
                               message_type, message)
@@ -36,7 +39,12 @@ class Message:
         return message_obj
 
     @staticmethod
-    def encode_type_and_length(message_type: int, message_length: int) -> bytes:
+    def encode_type_and_length(message_type: int,
+                               message_length: int) -> bytes:
+        """
+        Encodes type and length into 2 bytes, 2 and 14 bits each respectively
+        """
+
         if not 0 <= message_type <= 0b11:
             raise ValueError("Message type must be a 2 bit integer")
 
@@ -48,8 +56,12 @@ class Message:
         return (type_bits | length_bits).to_bytes(2, "little")
 
     @staticmethod
-    def decode_type_and_length(b: bytes) -> tuple[int, int]:
-        encoded_int = int.from_bytes(b, "little")
+    def decode_type_and_length(encoded_bytes: bytes) -> tuple[int, int]:
+        """
+        Decotes the 2 type and length conjoined bytes into its components
+        """
+
+        encoded_int = int.from_bytes(encoded_bytes, "little")
 
         message_type = 0b11 & encoded_int
         message_length = ((0xffff << 2) & encoded_int) >> 2
@@ -74,6 +86,10 @@ class Message:
             self.set_all(*args)
 
     def to_bytes(self) -> bytes:
+        """
+        Returns the byte representation of itself, or in other words, encodes
+        itself to bytes that fit the message protocol
+        """
 
         type_and_length_bytes = Message.encode_type_and_length(
             self.message_type, self.message_length
@@ -93,29 +109,47 @@ class Message:
         return self.to_bytes()
 
     def set_channel_id(self, channel_id: int) -> None:
+        """
+        Setter for channel id
+        """
         self.channel_id = channel_id
 
     def set_nickname(self, nickname: str) -> None:
+        """
+        Setter for nickname
+        """
         self.nickname = nickname
 
     def set_timestamp(self, timestamp: float) -> None:
-        if type(timestamp) == float:
+        """
+        Setter for timestamp
+        """
+        if isinstance(timestamp, float):
             timestamp = int(timestamp)
 
         self.timestamp = timestamp
 
     def set_message_type(self, message_type: int) -> None:
-        if not (0 <= message_type <= 0b11):
+        """
+        Setter for message type
+        """
+        if not 0 <= message_type <= 0b11:
             raise ValueError("Message type must be a 2 bit integer")
 
         self.message_type = message_type
 
     def set_message(self, message: str) -> None:
+        """
+        Setter for message
+        """
         self.message = message
         self.message_length = len(message)
 
     def set_all(self, channel_id: int, nickname: str, timestamp: float,
                 message_type: int, message: str) -> None:
+        """
+        Setter for all attributes
+        """
 
         self.set_channel_id(channel_id)
         self.set_nickname(nickname)
@@ -124,6 +158,9 @@ class Message:
         self.set_message(message)
 
     def format(self) -> str:
+        """
+        Formats the Message object itself into the client display format
+        """
 
         time_string = utilities.unix_to_str(self.timestamp)
 

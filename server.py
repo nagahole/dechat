@@ -6,7 +6,7 @@
 import socket
 import time
 import sys
-import src.utilities as utilities
+from src import utilities
 from src.message import Message, CLOSE_MESSAGE
 from src.protocol import message_recv, bind_socket_setup
 from src.commons import ServerMembers
@@ -115,7 +115,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                     i -= 1
 
                     connection_closed = True
-                    
+
             if message_obj is not None and not connection_closed:
 
                 msg = message_obj.message
@@ -145,7 +145,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                         func = server_command_map[command]
 
                         func(message_obj, conn, s_mems)
-                    
+
                     else:
 
                         echo_conn(conn, "Command not recognized")

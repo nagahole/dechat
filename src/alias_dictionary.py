@@ -1,3 +1,9 @@
+"""
+To solve the problem of the user needing to be able to
+access a channel by its name and the protocol needing to be
+able to access a channel by its id
+"""
+
 # Idea by https://discuss.python.org/t/syntax-for-aliases-to-keys-of-python-dictionaries/14992
 class AliasDictionary:
     """
@@ -51,7 +57,13 @@ class AliasDictionary:
         return len(self.dict)
 
     def values(self):
+        """
+        Intermediate method to return the stored dictionary's values
+        """
         return self.dict.values()
 
     def add_alias(self, key, alias):
+        """
+        Binds an alias to a key
+        """
         self.aliases[alias] = key

@@ -1,3 +1,7 @@
+"""
+Common information containers to be used between files
+"""
+
 import socket
 import time
 from src.alias_dictionary import AliasDictionary
@@ -5,6 +9,11 @@ from src.message import Message
 
 
 class ServerMembers:
+    """
+    Information container class for server variables / members. Exists
+    so functions in server_commands.py can mutate server members by
+    passing in an instance of this class
+    """
     def __init__(self, hostname: str, port: int) -> None:
         self.hostname = hostname
         self.port = port
@@ -22,10 +31,14 @@ class ServerMembers:
 
 
 class ClientStates:
-    def __init__(self, listening: bool=True, last_messager: str=None,
-                 in_channel: bool=False, active: bool=False) -> None:
+    """
+    Saves information for state to be shared between the main thread and
+    listener thread in client.py
+    """
+    def __init__(self, listening: bool = True, last_whisperer: str = None,
+                 in_channel: bool = False, active: bool = False) -> None:
         self.listening = listening
-        self.last_whisperer = last_messager
+        self.last_whisperer = last_whisperer
         self.in_channel = in_channel
         self.active = active
 
@@ -45,8 +58,12 @@ class ClientStates:
 
 
 class ClientConnectionWrapper:
-    def __init__(self, connection: socket.socket,
-                 messages_to_store: int=50) -> None:
+    """
+    A wrapper that stores a client-server socket connection and other relevant
+    information related
+    """
+    def __init__(self, connection: socket.socket | None,
+                 messages_to_store: int = 50) -> None:
 
         self.connection = connection
         self.name = None
@@ -60,6 +77,9 @@ class ClientConnectionWrapper:
         self.closed = False
 
     def close(self) -> None:
+        """
+        Closes the connection and its associated listener
+        """
         if self.states is not None:
             self.states.listening = False
             self.states.active = False
@@ -73,6 +93,11 @@ class ClientConnectionWrapper:
         self.closed = True
 
     def store_message(self, message_obj: Message) -> None:
+        """
+        Stores messages to be displayed when switching displays.
+
+        Does so intelligently to abide the max number of messages to store
+        """
         self.messages.insert(0, message_obj)
 
         if len(self.messages) > self.messages_to_store:

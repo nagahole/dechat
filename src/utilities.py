@@ -1,35 +1,46 @@
+"""
+Useful utility functions that may be used across multiple files
+"""
+
 import time
 import os
 from src.constants import MAX_PORT_VALUE
 
 
-def is_integer(s: str) -> bool:
-    if s[0] == "-":
-        s = s[1:]
-    return s.isnumeric()
+def is_integer(string: str) -> bool:
+    """
+    Returns whether an input string is an integer or not
+    """
+    if string[0] == "-":
+        string = string[1:]
+    return string.isnumeric()
 
 
 def format_time_period(seconds: float):
-    s = seconds // 1
-    m, s = divmod(s, 60)
-    h, m = divmod(m, 60)
-    d, h = divmod(h, 24)
+    """
+    Formats a time period into a more understandable combination of units
+    of time
+    """
+    secs = seconds // 1
+    mins, secs = divmod(secs, 60)
+    hours, mins = divmod(mins, 60)
+    days, hours = divmod(hours, 24)
 
-    s = int(s)
-    m = int(m)
-    h = int(h)
-    d = int(d)
+    secs = int(secs)
+    mins = int(mins)
+    hours = int(hours)
+    days = int(days)
 
     is_seconds = False
 
-    if d != 0:
-        res = f"{d} days, {h} hours, {m} minutes and {s} seconds"
-    elif h != 0:
-        res = f"{h} hours, {m} minutes and {s} seconds"
-    elif m != 0:
-        res = f"{m} minutes and {s} seconds"
+    if days != 0:
+        res = f"{days} days, {hours} hours, {mins} minutes and {secs} seconds"
+    elif hours != 0:
+        res = f"{hours} hours, {mins} minutes and {secs} seconds"
+    elif mins != 0:
+        res = f"{mins} minutes and {secs} seconds"
     else:
-        res = f"{s} seconds"
+        res = f"{secs} seconds"
         is_seconds = True
 
     if not is_seconds:
@@ -39,15 +50,26 @@ def format_time_period(seconds: float):
 
 
 def unix_to_str(unix_time: int) -> str:
+    """
+    Converts unix time to '[HH:MM:SS]' format
+    """
     return f"[{time.strftime('%H:%M:%S', time.localtime(unix_time))}]"
 
 
-def smart_split(s: str) -> list[str]:
-    return list(filter(lambda s: s != "", s.split()))
+def smart_split(string: str) -> list[str]:
+    """
+    Splits a string by whitespace and filters out empty splits
+    """
+    return list(filter(lambda s: s != "", string.split()))
 
 
-def split_hostname_port(s: str) -> list[str|None]:
-    splits = s.split(":")
+def split_hostname_port(string: str) -> tuple[str | None, int | None]:
+    """
+    Returns the hostname and port from a string as a tuple.
+
+    Returns None, None if input is invalid
+    """
+    splits = string.split(":")
 
     hostname = ":".join(splits[0:-1])
 
@@ -61,5 +83,9 @@ def split_hostname_port(s: str) -> list[str|None]:
 
     return hostname, port
 
+
 def clear_terminal() -> None:
+    """
+    Clears the terminal using bash commands
+    """
     os.system('cls||clear')

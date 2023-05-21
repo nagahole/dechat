@@ -10,7 +10,11 @@ from src.message import Message
 
 DO_LOG = False
 
+
 def log(*args, **kwargs):
+    """
+    Just a wrapper for print so I can easily enable or disable it
+    """
     if DO_LOG:
         print(*args, **kwargs)
 
@@ -67,15 +71,15 @@ def bind_socket_setup(hostname: str, port: int,
     except OSError:
         log("Address already in use")
         log("Please start the client on a different port, or wait for the "
-              "address to unbind")
+            "address to unbind")
 
     if successful:
         log(f"Hosting on {sock.getsockname()[0]}:{sock.getsockname()[1]}")
 
         sock.listen()
         return True, sock
-    else:
-        return False, None
+
+    return False, None
 
 
 def conn_socket_setup(hostname: str, port: int, timeout=0.1):
@@ -95,10 +99,10 @@ def conn_socket_setup(hostname: str, port: int, timeout=0.1):
         log("Connection Refused")
         log(f"It is possible that no server is running at {hostname}:{port}")
         connection = None
-    except OSError as e:
-        log(str(e))
+    except OSError as err:
+        log(str(err))
 
     if successful:
         return True, connection
-    else:
-        return False, None
+
+    return False, None

@@ -1,6 +1,11 @@
+"""
+Channels are a component of servers that contains members and can broadcast
+to every member messages as well as having its own commands
+"""
+
 import socket
 import time
-import src.utilities as utilities
+from src import utilities
 from src.commons import ServerMembers
 from src.protocol import message_send
 from src.message import Message
@@ -8,6 +13,10 @@ from src.constants import MAX_NICK_LENGTH, CHANNEL_NICK
 
 
 class Channel:
+    """
+    Channels are a component of servers that contains members and can
+    broadcast to every member messages as well as having its own commands
+    """
 
     instances = 0
 
@@ -28,13 +37,28 @@ class Channel:
         self.nickname_connection_map = {}
 
     def get_name(self) -> str:
+        """
+        Getter for name
+        """
         return self.name
 
     def get_messages(self) -> list:
+        """
+        Getter for messages
+        """
         return self.messages
 
-    def set_no_of_messages_saved(self, n: int) -> None:
-        self.messages_to_store = n
+    def get_connections(self) -> set[socket.socket]:
+        """
+        Getter for connections
+        """
+        return self.connections
+
+    def set_messages_to_store(self, num: int) -> None:
+        """
+        Setter for messages to store
+        """
+        self.messages_to_store = num
 
     def set_nickname(self, connection: socket.socket, nickname: str) -> str:
         """
@@ -86,20 +110,29 @@ class Channel:
         return True
 
     def welcome(self, connection: socket.socket) -> None:
+        """
+        Announces the welcome of a connection using its nickname
+        """
         nickname = self.connection_nickname_map[connection]
 
         self.announce(f"{nickname} joined the channel!")
 
     def send_message_history(self, connection: socket.socket,
                              ignore_recent: int = 0) -> None:
+        """
+        Echoes message history to a connection when they first join
+        a channel
+        """
+
         for i, msg in enumerate(reversed(self.messages)):
             if i < len(self.messages) - ignore_recent:
                 message_send(msg, connection)
 
-    def get_connections(self) -> set[socket.socket]:
-        return self.connections
-
     def remove_connection(self, connection: socket.socket) -> None:
+        """
+        Intelligently removes a connection along with any relationships it has
+        with nicknames
+        """
 
         self.connections.remove(connection)
 
@@ -112,6 +145,9 @@ class Channel:
             del self.connection_nickname_map[connection]
 
     def broadcast_message(self, message_obj: Message):
+        """
+        Echoes a message of type to all connections in the channel
+        """
         self.messages.insert(0, message_obj)
 
         if len(self.messages) > self.messages_to_store:
@@ -120,12 +156,20 @@ class Channel:
         for conn in self.connections:
             message_send(message_obj, conn)
 
-    def announce(self, s: str) -> None:
-        message_obj = Message(self.id, "*", time.time(), 0b00, s)
+    def announce(self, msg: str) -> None:
+        """
+        Broadcasts a message to all connections in the channel from the
+        channel itself
+        """
+        message_obj = Message(self.id, "*", time.time(), 0b00, msg)
         self.broadcast_message(message_obj)
 
     def handle_user_message(self, connection: socket.socket,
                             message_obj: Message) -> None:
+        """
+        Intelligently handles user messages by looking up its associated
+        nickname (if it exists) before broadcasting a message
+        """
 
         if connection in self.connection_nickname_map:
             nickname = self.connection_nickname_map[connection]
@@ -134,6 +178,9 @@ class Channel:
         self.broadcast_message(message_obj)
 
     def echo_conn(self, conn: socket.socket, message: str) -> None:
+        """
+        Echoes a connection a pre-formatted Message object
+        """
 
         message_obj = Message(
             self.id, CHANNEL_NICK, time.time(), 0b00, message
@@ -168,8 +215,8 @@ class Channel:
 
                 case "list":
 
-                    def nick_extractor(c: socket.socket) -> str:
-                        return self.connection_nickname_map[c]
+                    def nick_extractor(conn: socket.socket) -> str:
+                        return self.connection_nickname_map[conn]
 
                     echo = "\n".join(map(nick_extractor, self.connections))
 
@@ -218,7 +265,7 @@ class Channel:
 
                         message_limit = int(splits[1])
 
-                        self.set_no_of_messages_saved(message_limit)
+                        self.set_messages_to_store(message_limit)
 
                 case "pass":
 
@@ -285,5 +332,4 @@ class Channel:
 
             return valid_command
 
-        else:
-            return False
+        return False

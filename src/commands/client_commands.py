@@ -1,29 +1,40 @@
-import time
-import threading
-import src.utilities as utilities
-from src.message import Message, CLOSE_MESSAGE
+"""
+Implementation of all client commands and stores a map associating each
+command to their functions. Has multiple maps for the multiple possible
+different "stages" of client commands
+"""
+
+from src import utilities
+from src.message import CLOSE_MESSAGE
 from src.commons import (
     ClientConnectionWrapper,
-    ClientStates
 )
 from src.protocol import conn_socket_setup, message_send
 from src.constants import MAX_NICK_LENGTH
 
 
-"""
-Prefix meanings:
 
-- c: client
-- cs: client sender
-- m: mutual
+# Prefix meanings:
 
-"""
+# - c: client
+# - cs: client sender
+# - m: mutual
 
-def c_c(user_input: str, client) -> None:
+
+
+def c_c(_user_input: str, client) -> None:
+    """
+    TODO Remove this - Just for convenience
+    """
     c_connect("/connect localhost:9996", client)
 
 
 def c_connect(user_input: str, client) -> None:
+    """
+    CLIENT COMMAND
+
+    Attempts to connect to a hostname and port
+    """
     splits = utilities.smart_split(user_input)
 
     if len(splits) < 2:
@@ -61,11 +72,19 @@ def c_connect(user_input: str, client) -> None:
         print(f"Failed to connect to server {hostname}:{port}")
 
 
-def c_quit(user_input: str, client) -> None:
+def c_quit(_user_input: str, client) -> None:
+    """
+    CLIENT COMMAND
+
+    Quits the client
+    """
     client.quitted = True
 
 
 def c_nick(user_input: str, client) -> None:
+    """
+    Sets a new default nickname. In abeyance when in a server
+    """
     splits = utilities.smart_split(user_input)
 
     if len(splits) < 2:
@@ -80,8 +99,13 @@ def c_nick(user_input: str, client) -> None:
         print(f"Default nickname set to {new_nick}")
 
 
-def cs_reply(user_input: str, client,
+def cs_reply(user_input: str, _client,
              wrapper: ClientConnectionWrapper) -> None:
+    """
+    CLIENT SENDER COMMAND
+
+    Implicitly calls /msg to the last whisperer to this client
+    """
 
     splits = utilities.smart_split(user_input)
 
@@ -101,8 +125,14 @@ def cs_reply(user_input: str, client,
     wrapper.message_obj.set_message(echo)
 
 
-def cs_quit(user_input: str, client,
-            wrapper: ClientConnectionWrapper) -> str:
+def cs_quit(_user_input: str, _client,
+            wrapper: ClientConnectionWrapper) -> None:
+    """
+    CLIENT SENDER COMMAND
+
+    Quits channel if in a channel
+    Quits server if not in a channel
+    """
 
     if not wrapper.states.in_channel:
         print("Disconnecting from server...")
@@ -115,6 +145,13 @@ def cs_quit(user_input: str, client,
 
 def cs_connect(user_input: str, client,
                wrapper: ClientConnectionWrapper) -> None:
+
+    """
+    CLIENT SENDER COMMAND
+
+    Connects to a new server. If multi-con not enabled leaves the previous
+    one, else appends to the connection dictionary
+    """
 
     if wrapper is not None:
         wrapper.message_obj = None
@@ -169,8 +206,15 @@ def cs_connect(user_input: str, client,
 
 # The _ parameter is there just to make the function signature work with both
 # client commands and client sender commands
-def m_list_displays(user_input: str, client,
-                    wrapper: ClientConnectionWrapper=None) -> None:
+def m_list_displays(_user_input: str, client,
+                    wrapper: ClientConnectionWrapper = None) -> None:
+    """
+    MUTUAL COMMAND
+
+    Lists all connections to servers and their associated name (hostname:port)
+    and joined channel (if it exists)
+    """
+
     if wrapper is not None:
         wrapper.message_obj = None
 
@@ -192,7 +236,7 @@ def m_list_displays(user_input: str, client,
         echo = f"{key} : {name}"
 
         if (not i_wrapper.states.joining_channel and
-            i_wrapper.channel_name is not None):
+           i_wrapper.channel_name is not None):
 
             echo += f" | {i_wrapper.channel_name}"
 
@@ -202,7 +246,13 @@ def m_list_displays(user_input: str, client,
 
 
 def m_display(user_input: str, client,
-              wrapper: ClientConnectionWrapper=None) -> None:
+              wrapper: ClientConnectionWrapper = None) -> None:
+    """
+    MUTUAL COMMAND
+
+    Displays the specified numbered connection
+    """
+
     if wrapper is not None:
         wrapper.message_obj = None
 
