@@ -1,8 +1,8 @@
 # Idea by https://discuss.python.org/t/syntax-for-aliases-to-keys-of-python-dictionaries/14992
 class AliasDictionary:
     """
-    To solve the problem of the user needing to be able to 
-    access a channel by its name and the protocol needing to be 
+    To solve the problem of the user needing to be able to
+    access a channel by its name and the protocol needing to be
     able to access a channel by its id
     """
     def __init__(self, *args, **kwargs):
@@ -13,7 +13,7 @@ class AliasDictionary:
 
         # Will get the key an alias points to if exists, otherwise
         # will try to access the base dictionary with just the given key
-        key = self.aliases.get(key, key) 
+        key = self.aliases.get(key, key)
 
         if key in self.dict:
             return self.dict[key]

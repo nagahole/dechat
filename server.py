@@ -7,9 +7,9 @@ import socket
 import time
 import sys
 import src.utilities as utilities
-from src.message import Message
+from src.message import Message, CLOSE_MESSAGE
 from src.protocol import message_recv, bind_socket_setup
-from src.commons import ServerVariables
+from src.commons import ServerMembers
 from src.commands.server_commands import server_command_map, echo_conn
 
 # A better solution to this would be to poll rather than try and except
@@ -53,18 +53,20 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
         print("Server setup not successful, please try again")
         return
 
-    s_vars = ServerVariables(hostname, port)
+    print(f"Hosting on {hostname}:{port}")
 
-    while not s_vars.quitted:
+    s_mems = ServerMembers(hostname, port)
+
+    while not s_mems.quitted:
 
         prev = time.time()
 
         try:  # Check for a new connection
             connection, addr = sock.accept()
             connection.settimeout(0.1)
-            s_vars.conns.append(connection)
+            s_mems.conns.append(connection)
 
-            server_command_map["motd"](Message(), connection, s_vars)
+            server_command_map["motd"](Message(), connection, s_mems)
 
             print(f"New Connection! {addr}")
 
@@ -73,13 +75,13 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
         # Check currently connected sessions
         i = 0
-        while i < len(s_vars.conns):
+        while i < len(s_mems.conns):
 
             message_obj = None
 
             try:  # Check if any data has been passed in and print it
 
-                message_obj = message_recv(s_vars.conns[i])
+                message_obj = message_recv(s_mems.conns[i])
 
                 print(f"Message received from {i}")
 
@@ -88,29 +90,26 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                 pass
             except ConnectionResetError:
                 print(f"Connection {i} unexpectedly got reset")
-                s_vars.conns.pop(i)
+                s_mems.conns.pop(i)
                 i -= 1
 
             connection_closed = False
 
             if message_obj is not None:
 
-                msg = message_obj.message
-
-                # We assume that an empty message closes the connection.
-                if msg == "":
+                if message_obj == CLOSE_MESSAGE:
 
                     print("Closing user " + str(i))
 
-                    conn = s_vars.conns.pop(i)
+                    conn = s_mems.conns.pop(i)
 
-                    if conn in s_vars.conn_channel_map:
-                        channel = s_vars.conn_channel_map[conn]
+                    if conn in s_mems.conn_channel_map:
+                        channel = s_mems.conn_channel_map[conn]
                         channel.remove_connection(conn)
-                        del s_vars.conn_channel_map[conn]
+                        del s_mems.conn_channel_map[conn]
 
-                    if message_obj.nickname in s_vars.nick_conn_map:
-                        del s_vars.nick_conn_map[message_obj.nickname]
+                    if message_obj.nickname in s_mems.nick_conn_map:
+                        del s_mems.nick_conn_map[message_obj.nickname]
 
                     conn.close()
                     i -= 1
@@ -119,14 +118,16 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                     
             if message_obj is not None and not connection_closed:
 
-                conn = s_vars.conns[i]
-                s_vars.nick_conn_map[message_obj.nickname] = conn
+                msg = message_obj.message
+
+                conn = s_mems.conns[i]
+                s_mems.nick_conn_map[message_obj.nickname] = conn
 
                 is_command = msg and msg[0] == "/"
 
-                if conn in s_vars.conn_channel_map:
+                if conn in s_mems.conn_channel_map:
 
-                    channel = s_vars.conn_channel_map[conn]
+                    channel = s_mems.conn_channel_map[conn]
 
                     if is_command:
                         channel.handle_command_input(conn, message_obj)
@@ -143,7 +144,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
                         func = server_command_map[command]
 
-                        func(message_obj, conn, s_vars)
+                        func(message_obj, conn, s_mems)
                     
                     else:
 

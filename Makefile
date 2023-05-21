@@ -19,6 +19,12 @@ server: server.py
 		-e 'activate' \
 	-e 'end tell'
 
+	@osascript \
+	-e 'tell app "Terminal"' \
+		-e 'do script "cd $(DIR) && python3 $^ localhost 9999"' \
+		-e 'activate' \
+	-e 'end tell'
+
 both:
 	$(eval DIR := $(shell pwd))
 	@osascript \

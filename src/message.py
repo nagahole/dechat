@@ -1,3 +1,4 @@
+import time
 import src.utilities as utilities
 from src.constants import NICK_MSG_SEPARATOR, MAX_NICK_LENGTH
 
@@ -19,7 +20,7 @@ class Message:
         Returns None if passed in bytes is invalid
         """
         if len(b) < 40:
-            return Message()
+            None
 
         channel_id = int.from_bytes(b[:2], "little")
         nickname = b[2:34].decode("ascii").strip("\x00")
@@ -27,7 +28,7 @@ class Message:
 
         message_type, message_length = Message.decode_type_and_length(b[38:40])
 
-        message = b[40:40 + message_length + 1].decode("ascii")
+        message = b[40:40 + message_length].decode("ascii")
 
         message_obj = Message(channel_id, nickname, timestamp,
                               message_type, message)
@@ -55,7 +56,7 @@ class Message:
 
         return message_type, message_length
 
-    def __init__(self, channel_id: int = None, nickname: str = None, 
+    def __init__(self, channel_id: int = None, nickname: str = None,
                  timestamp: float = None, message_type: int = None,
                  message: str = None) -> None:
 
@@ -73,16 +74,17 @@ class Message:
             self.set_all(*args)
 
     def to_bytes(self) -> bytes:
-        
-        type_and_length = Message.encode_type_and_length(
-            self.message_type, self.message_length)
+
+        type_and_length_bytes = Message.encode_type_and_length(
+            self.message_type, self.message_length
+        )
 
         encoding = b""
 
         encoding += self.channel_id.to_bytes(2, "little")
         encoding += self.nickname.rjust(32, "\x00").encode("ascii")
         encoding += self.timestamp.to_bytes(4, "little")
-        encoding += type_and_length
+        encoding += type_and_length_bytes
         encoding += self.message.encode("ascii")
 
         return encoding
@@ -126,7 +128,7 @@ class Message:
         time_string = utilities.unix_to_str(self.timestamp)
 
         message_separator = NICK_MSG_SEPARATOR
-            
+
         if "->" in self.nickname:  # Is a message
             message_separator = ":"
 
@@ -150,4 +152,25 @@ class Message:
 
         return f"{time_string}{nickname}{message_separator} {echo}"
 
+    def __eq__(self, other) -> bool:
+        return all((
+            self.channel_id == other.channel_id,
+            self.nickname == other.nickname,
+            self.timestamp == other.timestamp,
+            self.message_type == other.message_type,
+            self.message_length == other.message_length,
+            self.message == other.message
+        ))
 
+    def __str__(self) -> str:
+        return "|".join((map(str, [
+            self.channel_id,
+            self.nickname,
+            self.timestamp,
+            self.message_type,
+            self.message_length,
+            self.message
+        ])))
+
+
+CLOSE_MESSAGE = Message(0, "", 0, 0b00, "")

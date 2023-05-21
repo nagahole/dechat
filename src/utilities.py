@@ -1,4 +1,6 @@
 import time
+import os
+from src.constants import MAX_PORT_VALUE
 
 
 def is_integer(s: str) -> bool:
@@ -42,3 +44,22 @@ def unix_to_str(unix_time: int) -> str:
 
 def smart_split(s: str) -> list[str]:
     return list(filter(lambda s: s != "", s.split()))
+
+
+def split_hostname_port(s: str) -> list[str|None]:
+    splits = s.split(":")
+
+    hostname = ":".join(splits[0:-1])
+
+    if not is_integer(splits[-1]):
+        return None, None
+
+    port = int(splits[-1])
+
+    if not 0 <= port <= MAX_PORT_VALUE:
+        return None, None
+
+    return hostname, port
+
+def clear_terminal() -> None:
+    os.system('cls||clear')

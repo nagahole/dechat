@@ -1,6 +1,7 @@
 import socket
 import time
 import src.utilities as utilities
+from src.commons import ServerMembers
 from src.protocol import message_send
 from src.message import Message
 from src.constants import MAX_NICK_LENGTH, CHANNEL_NICK
@@ -10,17 +11,17 @@ class Channel:
 
     instances = 0
 
-    def __init__(self, creator: socket.socket, on_connection_remove: callable,
+    def __init__(self, s_mems: ServerMembers, creator: socket.socket,
                  name: str, password: str = None) -> None:
 
+        self.s_mems = s_mems
         self.creator = creator
-        self.on_connection_remove = on_connection_remove
         self.name = name
         self.password = password
         self.id = Channel.instances
         Channel.instances += 1
 
-        self.no_of_messages_saved = 50
+        self.messages_to_store = 50
         self.messages = []
         self.connections = set()
         self.connection_nickname_map = {}
@@ -33,7 +34,7 @@ class Channel:
         return self.messages
 
     def set_no_of_messages_saved(self, n: int) -> None:
-        self.no_of_messages_saved = n
+        self.messages_to_store = n
 
     def set_nickname(self, connection: socket.socket, nickname: str) -> str:
         """
@@ -46,7 +47,7 @@ class Channel:
                 del self.nickname_connection_map[old_nick]
 
             del self.connection_nickname_map[connection]
-        
+
         if nickname in self.nickname_connection_map:
             i = 1
 
@@ -63,7 +64,7 @@ class Channel:
 
         return nickname
 
-    def add_connection(self, connection: socket.socket, nickname: str, 
+    def add_connection(self, connection: socket.socket, nickname: str,
                        password: str = "") -> bool:
         """
         Adds a connection to the channel
@@ -87,7 +88,7 @@ class Channel:
     def welcome(self, connection: socket.socket) -> None:
         nickname = self.connection_nickname_map[connection]
 
-        self.announce(f"{nickname} joined the channel")
+        self.announce(f"{nickname} joined the channel!")
 
     def send_message_history(self, connection: socket.socket,
                              ignore_recent: int = 0) -> None:
@@ -100,8 +101,6 @@ class Channel:
 
     def remove_connection(self, connection: socket.socket) -> None:
 
-        self.on_connection_remove(connection)
-
         self.connections.remove(connection)
 
         if connection in self.connection_nickname_map:
@@ -109,14 +108,14 @@ class Channel:
 
             if nickname in self.nickname_connection_map:
                 del self.nickname_connection_map[nickname]
-            
+
             del self.connection_nickname_map[connection]
 
     def broadcast_message(self, message_obj: Message):
         self.messages.insert(0, message_obj)
 
-        if len(self.messages) > self.no_of_messages_saved:
-            self.messages = self.messages[:self.no_of_messages_saved]
+        if len(self.messages) > self.messages_to_store:
+            self.messages = self.messages[:self.messages_to_store]
 
         for conn in self.connections:
             message_send(message_obj, conn)
@@ -181,7 +180,7 @@ class Channel:
                         msg = message_obj.message.split(" ", 1)[1]
 
                         nick = self.connection_nickname_map[connection]
-                        
+
                         self.announce(f"{nick} {msg}")
 
                 case "admin":
@@ -203,7 +202,7 @@ class Channel:
                             echo += " doesn't exist"
 
                         elif is_admin:
-                            
+
                             echo += " is an operator"
                         else:
 
@@ -213,7 +212,7 @@ class Channel:
 
                 case "message_limit":
 
-                    if (len(splits) >= 2 and 
+                    if (len(splits) >= 2 and
                             utilities.is_integer(splits[1]) and
                             self.creator == connection):
 
@@ -222,7 +221,7 @@ class Channel:
                         self.set_no_of_messages_saved(message_limit)
 
                 case "pass":
-                    
+
                     is_admin = self.creator == connection
 
                     if not is_admin:
@@ -239,7 +238,7 @@ class Channel:
                         self.password = password
 
                 case "msg":
-                    
+
                     target_conn = None
                     target_name = ""
 
@@ -265,7 +264,7 @@ class Channel:
                         message_send(message_obj, target_conn)
 
                 case "quit":
-                    
+
                     quit_message = ""
 
                     if len(splits) >= 2:
@@ -279,7 +278,8 @@ class Channel:
                         self.announce(f"{nick} has quit")
 
                     self.remove_connection(connection)
-                    
+                    del self.s_mems.conn_channel_map[connection]
+
                 case _:
                     valid_command = False
 

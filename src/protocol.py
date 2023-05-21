@@ -8,6 +8,13 @@ from src.message import Message
 # YOU WILL NEED TO MODIFY THESE FUNCTIONS TO SUIT THE HEADER FORMAT IN THE SPEC
 
 
+DO_LOG = False
+
+def log(*args, **kwargs):
+    if DO_LOG:
+        print(*args, **kwargs)
+
+
 def message_send(message_obj: Message, connection: socket.socket) -> bytes:
     """
     message_send
@@ -20,7 +27,7 @@ def message_send(message_obj: Message, connection: socket.socket) -> bytes:
     return encoding
 
 
-def message_recv(connection) -> Message:
+def message_recv(connection: socket.socket) -> Message:
     """
     message_recv
     Waits for a message on the connection and attempts to decode it
@@ -50,20 +57,20 @@ def bind_socket_setup(hostname: str, port: int,
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(timeout)
-    
+
     successful = False
 
     try:
-        print(f"Trying to bind to {hostname}:{port}")
+        log(f"Trying to bind to {hostname}:{port}")
         sock.bind((hostname, port))
         successful = True
     except OSError:
-        print("Address already in use")
-        print("Please start the client on a different port, or wait for the "
+        log("Address already in use")
+        log("Please start the client on a different port, or wait for the "
               "address to unbind")
 
     if successful:
-        print(f"Hosting on {sock.getsockname()[0]}:{sock.getsockname()[1]}")
+        log(f"Hosting on {sock.getsockname()[0]}:{sock.getsockname()[1]}")
 
         sock.listen()
         return True, sock
@@ -77,7 +84,7 @@ def conn_socket_setup(hostname: str, port: int, timeout=0.1):
         :: hostname : str :: hostname to connect to
         :: port : int :: port to connect to
     """
-    print(f"Setting up socket at {hostname}:{port}")
+    log(f"Setting up socket at {hostname}:{port}")
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(timeout)
     successful = False
@@ -85,11 +92,11 @@ def conn_socket_setup(hostname: str, port: int, timeout=0.1):
         connection.connect((hostname, port))
         successful = True
     except ConnectionRefusedError:
-        print("Connection Refused")
-        print(f"It is possible that no server is running at {hostname}:{port}")
+        log("Connection Refused")
+        log(f"It is possible that no server is running at {hostname}:{port}")
         connection = None
     except OSError as e:
-        print(str(e))
+        log(str(e))
 
     if successful:
         return True, connection
