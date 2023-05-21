@@ -6,11 +6,19 @@
 import socket
 import time
 import sys
+from src import ansi
 from src import utilities
 from src.message import Message, CLOSE_MESSAGE
-from src.protocol import message_recv, bind_socket_setup
-from src.commons import ServerMembers
+from src.protocol import message_send, message_recv, bind_socket_setup
+from src.commons import ServerMembers, ChannelLinkInfo
 from src.commands.server_commands import server_command_map, echo_conn
+from src.constants import (
+    SERVER_CHANNEL_ID,
+    LINK_FLAG,
+    LINK_RESPONSE_FLAG,
+    UNLINK_FLAG,
+    SEP
+)
 
 # A better solution to this would be to poll rather than try and except
 # But due to Windows compatibility issues Python's socket object does not
@@ -50,8 +58,18 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
     successful, sock = bind_socket_setup(hostname, port)
 
     if not successful:
-        print("Server setup not successful, please try again")
-        return
+
+        if "--auto-retry" in sys.argv:
+            while not successful:
+                for i in range(3, 0, -1):
+                    print(f"Connection not successful. Retrying in {i}")
+                    time.sleep(1)
+                    ansi.clear_line()
+
+                successful, sock = bind_socket_setup(hostname, port)
+        else:
+            print("Server setup not successful, please try again")
+            return
 
     print(f"Hosting on {hostname}:{port}")
 
@@ -66,7 +84,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
             connection.settimeout(0.1)
             s_mems.conns.append(connection)
 
-            server_command_map["motd"](Message(), connection, s_mems)
+            server_command_map["motd"](None, connection, s_mems)
 
             print(f"New Connection! {addr}")
 
@@ -77,11 +95,13 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
         i = 0
         while i < len(s_mems.conns):
 
-            message_obj = None
+            message_obj = -1
 
             try:  # Check if any data has been passed in and print it
 
                 message_obj = message_recv(s_mems.conns[i])
+
+                print(f"RECV: {message_obj}")
 
                 print(f"Message received from {i}")
 
@@ -95,60 +115,158 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
             connection_closed = False
 
-            if message_obj is not None:
+            if message_obj is None or message_obj == CLOSE_MESSAGE:
 
-                if message_obj == CLOSE_MESSAGE:
+                print("Closing user " + str(i))
 
-                    print("Closing user " + str(i))
+                conn = s_mems.conns.pop(i)
 
-                    conn = s_mems.conns.pop(i)
+                if conn in s_mems.conn_channel_map:
+                    channel = s_mems.conn_channel_map[conn]
+                    channel.remove_connection(conn)
+                    del s_mems.conn_channel_map[conn]
 
-                    if conn in s_mems.conn_channel_map:
-                        channel = s_mems.conn_channel_map[conn]
-                        channel.remove_connection(conn)
-                        del s_mems.conn_channel_map[conn]
-
+                if message_obj is not None:
                     if message_obj.nickname in s_mems.nick_conn_map:
                         del s_mems.nick_conn_map[message_obj.nickname]
 
-                    conn.close()
-                    i -= 1
+                conn.close()
+                i -= 1
 
-                    connection_closed = True
+                connection_closed = True
 
-            if message_obj is not None and not connection_closed:
+            if isinstance(message_obj, Message) and not connection_closed:
 
                 msg = message_obj.message
-
                 conn = s_mems.conns[i]
-                s_mems.nick_conn_map[message_obj.nickname] = conn
 
-                is_command = msg and msg[0] == "/"
+                if message_obj.message_type not in (0b11, 0b10):
 
-                if conn in s_mems.conn_channel_map:
+                    s_mems.nick_conn_map[message_obj.nickname] = conn
 
-                    channel = s_mems.conn_channel_map[conn]
+                    is_command = msg and msg[0] == "/"
 
-                    if is_command:
-                        channel.handle_command_input(conn, message_obj)
-                    else:
-                        channel.handle_user_message(conn, message_obj)
+                    if conn in s_mems.conn_channel_map:
 
-                elif is_command:
-                    splits = msg.split(" ")
-                    splits = list(filter(lambda s: s != "", splits))
+                        channel = s_mems.conn_channel_map[conn]
 
-                    command = splits[0][1:]
+                        if is_command:
+                            channel.handle_command_input(conn, message_obj)
+                        else:
+                            channel.handle_user_message(conn, message_obj)
 
-                    if command in server_command_map:
+                    elif is_command:
+                        splits = msg.split(" ")
+                        splits = list(filter(lambda s: s != "", splits))
 
-                        func = server_command_map[command]
+                        command = splits[0][1:]
 
-                        func(message_obj, conn, s_mems)
+                        if command in server_command_map:
 
-                    else:
+                            func = server_command_map[command]
 
-                        echo_conn(conn, "Command not recognized")
+                            func(message_obj, conn, s_mems)
+
+                        else:
+
+                            echo_conn(conn, "Command not recognized")
+
+                elif message_obj.message_type == 0b10:
+
+                    if msg.startswith(LINK_FLAG):
+                        # Channel linkage requests
+                        # Standard is:
+                        # '--link|<channel_name>|<hostname>|<port>|'
+                        # Where | is the special SEP constant
+                        splits = msg.split(SEP)
+
+                        channel_name = splits[1]
+
+                        channel_id = SERVER_CHANNEL_ID
+                        channel = None
+
+                        if channel_name in s_mems.channels:
+                            channel = s_mems.channels[channel_name]
+                            channel_id = channel.id
+
+                        # Requested link channel exists
+                        if channel is not None:
+
+                            link_info = ChannelLinkInfo(
+                                channel_name=channel_name,
+                                hostname=splits[2],
+                                port=int(splits[3]),
+                                connection=conn,
+                                channel_id=message_obj.channel_id
+                            )
+
+                            channel.link_channel(link_info)
+
+                        response = Message(
+                            channel_id,
+                            "",
+                            time.time(),
+                            0b10,
+                            SEP.join((
+                                LINK_RESPONSE_FLAG,
+                                channel_name,
+                                hostname,
+                                str(port)
+                            ))
+                        )
+
+                        print(f"SENT: {response}")
+                        message_send(response, conn)
+
+                    elif msg.startswith(UNLINK_FLAG):
+                        # Channel unlinkage requests
+                        # Standard is:
+                        # '--link|<channel_name>|<hostname>|<port>|'
+                        # Where | is the special SEP constant
+
+                        splits = msg.split(SEP)
+
+                        channel_name = splits[1]
+
+                        if channel_name in s_mems.channels:
+                            channel = s_mems.channels[channel_name]
+
+                            channel.unlink_channel(
+                                channel_name,
+                                hostname=splits[2],
+                                port=int(splits[3])
+                            )
+
+                    elif msg.startswith(LINK_RESPONSE_FLAG):
+                        # Standard is:
+                        # '--response|<channel_name>|<hostname>|<port>|'
+
+                        success = message_obj.channel_id != SERVER_CHANNEL_ID
+
+                        if success:
+                            splits = msg.split(SEP)
+
+                            channel_name = splits[1]
+
+                            for channel in s_mems.channels.values():
+                                if channel.name == channel_name:
+
+                                    link_info = ChannelLinkInfo(
+                                        channel_name=channel_name,
+                                        hostname=splits[2],
+                                        port=int(splits[3]),
+                                        connection=conn,
+                                        channel_id = message_obj.channel_id
+                                    )
+
+                                    channel.link_channel(link_info)
+                                    break
+
+                elif message_obj.message_type == 0b11:
+                    # / Cross server channel synchronisation
+                    channel = s_mems.channels[message_obj.channel_id]
+                    message_obj.set_message_type(0b00)
+                    channel.broadcast_message(message_obj, is_relay=True)
 
             i += 1
 

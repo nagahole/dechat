@@ -18,3 +18,11 @@ def clear_lines(num: int) -> None:
     """
     for _ in range(num):
         clear_line()
+
+
+def clear_terminal() -> None:
+    """
+    Clears the terminal using ansi escape sequences
+    """
+    print("\033[2J")
+    print("\033[3J")

@@ -3,7 +3,6 @@ Useful utility functions that may be used across multiple files
 """
 
 import time
-import os
 from src.constants import MAX_PORT_VALUE
 
 
@@ -82,10 +81,3 @@ def split_hostname_port(string: str) -> tuple[str | None, int | None]:
         return None, None
 
     return hostname, port
-
-
-def clear_terminal() -> None:
-    """
-    Clears the terminal using bash commands
-    """
-    os.system('cls||clear')

@@ -29,7 +29,9 @@ class Message:
         nickname = message_bytes[2:34].decode("ascii").strip("\x00")
         timestamp = int.from_bytes(message_bytes[34:38], "little")
 
-        message_type, message_length = Message.decode_type_and_length(message_bytes[38:40])
+        message_type, message_length = Message.decode_type_and_length(
+            message_bytes[38:40]
+        )
 
         message = message_bytes[40:40 + message_length].decode("ascii")
 
@@ -189,7 +191,26 @@ class Message:
 
         return f"{time_string}{nickname}{message_separator} {echo}"
 
+    def copy(self) -> "Message":
+        """
+        Returns a new Message object with the same exact attributes
+
+        Useful for sending variations of a message while needing to store
+        the original
+        """
+        return Message(
+            self.channel_id,
+            self.nickname,
+            self.timestamp,
+            self.message_type,
+            self.message
+        )
+
     def __eq__(self, other) -> bool:
+
+        if not isinstance(other, Message):
+            return False
+
         return all((
             self.channel_id == other.channel_id,
             self.nickname == other.nickname,
@@ -208,6 +229,16 @@ class Message:
             self.message_length,
             self.message
         ])))
+
+    def __hash__(self) -> int:
+        return hash((
+            self.channel_id,
+            self.nickname,
+            self.timestamp,
+            self.message_type,
+            self.message_length,
+            self.message
+        ))
 
 
 CLOSE_MESSAGE = Message(0, "", 0, 0b00, "")

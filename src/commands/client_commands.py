@@ -4,6 +4,7 @@ command to their functions. Has multiple maps for the multiple possible
 different "stages" of client commands
 """
 
+from src import ansi
 from src import utilities
 from src.message import CLOSE_MESSAGE
 from src.commons import (
@@ -55,7 +56,7 @@ def c_connect(user_input: str, client) -> None:
 
     hostname, port = utilities.split_hostname_port(splits[1])
 
-    if hostname is None or port is None:
+    if None in (hostname, port):
         return
 
     print("Connecting to server...")
@@ -182,7 +183,7 @@ def cs_connect(user_input: str, client,
     successful, connection = conn_socket_setup(hostname, port)
 
     if successful and client.ui_enabled:
-        utilities.clear_terminal()
+        ansi.clear_terminal()
 
     print("Connecting to server...")
 
@@ -257,6 +258,9 @@ def m_display(user_input: str, client,
         wrapper.message_obj = None
 
     splits = utilities.smart_split(user_input)
+
+    if len(splits) < 2:
+        return
 
     display_num = splits[1]
 

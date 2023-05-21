@@ -44,6 +44,7 @@ class ClientStates:
 
         self.pinging_for_info = False
         self.joining_channel = False
+        self.sender_started = False
 
     # For debugging purposes
     def __str__(self) -> str:
@@ -102,3 +103,16 @@ class ClientConnectionWrapper:
 
         if len(self.messages) > self.messages_to_store:
             self.messages = self.messages[:self.messages_to_store]
+
+
+class ChannelLinkInfo:
+    """
+    Stores information for a channel link
+    """
+    def __init__(self, channel_name: str, hostname: str, port: int,
+                 connection: socket.socket, channel_id: int) -> None:
+        self.channel_name = channel_name
+        self.hostname = hostname
+        self.port = port
+        self.connection = connection
+        self.channel_id = channel_id

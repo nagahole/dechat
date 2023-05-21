@@ -126,7 +126,7 @@ class Client:
         self.current_wrapper = wrapper
 
         if clear_terminal and self.ui_enabled:
-            utilities.clear_terminal()
+            ansi.clear_terminal()
 
         # Don't want handle_message_received to
         # change states in actual wrapper
@@ -156,6 +156,8 @@ class Client:
             message_send(ping, wrapper.connection)
 
         self.client_sender(wrapper)
+
+        wrapper.states.sender_started = False
 
         self.current_wrapper = None
 
@@ -211,6 +213,7 @@ class Client:
         Sends messages from the client
         """
 
+        wrapper.states.sender_started = True
         empty_message = False
 
         # Close the connection on an empty message
@@ -329,7 +332,11 @@ class Client:
                     if self.ui_enabled and real_message:
                         print("\r" + message.format(), end="")
                         sys.stdout.flush()
-                        print(f"\n{INPUT_PROMPT}", end="")
+
+                        if wrapper.states.sender_started:
+                            print(f"\n{INPUT_PROMPT}", end="")
+                        else:
+                            print()
                     else:
                         print(message.format())
 
@@ -354,7 +361,10 @@ class Client:
                         if self.ui_enabled and real_message:
                             print("\r" + message.format(), end="")
                             sys.stdout.flush()
-                            print(f"\n{INPUT_PROMPT}", end="")
+                            if wrapper.states.sender_started:
+                                print(f"\n{INPUT_PROMPT}", end="")
+                            else:
+                                print()
                         else:
                             print(message.format())
 

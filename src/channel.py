@@ -3,10 +3,11 @@ Channels are a component of servers that contains members and can broadcast
 to every member messages as well as having its own commands
 """
 
+import threading
 import socket
 import time
 from src import utilities
-from src.commons import ServerMembers
+from src.commons import ServerMembers, ChannelLinkInfo
 from src.protocol import message_send
 from src.message import Message
 from src.constants import MAX_NICK_LENGTH, CHANNEL_NICK
@@ -35,6 +36,10 @@ class Channel:
         self.connections = set()
         self.connection_nickname_map = {}
         self.nickname_connection_map = {}
+
+        self.linked_channels = {}
+        self.linked_messages = set()
+        self.marked_for_deletion = set()
 
     def get_name(self) -> str:
         """
@@ -87,6 +92,30 @@ class Channel:
         self.nickname_connection_map[nickname] = connection
 
         return nickname
+
+    def link_channel(self, info: ChannelLinkInfo) -> None:
+        """
+        Appends to linked_channels the connection and channel id
+        """
+        key = (info.channel_name, info.hostname, info.port)
+
+        self.linked_channels[key] = info
+
+    def unlink_channel(self, channel_name: str, hostname: str,
+                       port: int) -> None:
+        """
+        Unlinks a channel from this channel.
+
+        Will raise error of input is not valid
+        """
+        del self.linked_channels[(channel_name, hostname, port)]
+
+    def linked_to_channel(self, channel_name: str, hostname: str,
+                          port: int) -> None:
+        """
+        Returns bool on whether inputs correspond to a linked channel
+        """
+        return (channel_name, hostname, port) in self.linked_channels
 
     def add_connection(self, connection: socket.socket, nickname: str,
                        password: str = "") -> bool:
@@ -144,10 +173,31 @@ class Channel:
 
             del self.connection_nickname_map[connection]
 
-    def broadcast_message(self, message_obj: Message):
+    def broadcast_message(self, message_obj: Message, is_relay: bool = False):
         """
         Echoes a message of type to all connections in the channel
         """
+        if is_relay and message_obj in self.linked_messages:
+
+            print("Caught repeat message")
+
+            if message_obj not in self.marked_for_deletion:
+
+                self.marked_for_deletion.add(message_obj)
+
+                def callback() -> None:
+                    self.linked_messages.remove(message_obj)
+                    self.marked_for_deletion.remove(message_obj)
+
+                # Gives some time for linked messages to circulate around
+                # multiple linked channels before removing it from the set to
+                # free up space
+                threading.Timer(10, callback).start()
+
+            return
+
+        self.linked_messages.add(message_obj)
+
         self.messages.insert(0, message_obj)
 
         if len(self.messages) > self.messages_to_store:
@@ -155,6 +205,14 @@ class Channel:
 
         for conn in self.connections:
             message_send(message_obj, conn)
+
+        relay = message_obj.copy()
+
+        relay.set_message_type(0b11)
+
+        for link_info in self.linked_channels.values():
+            relay.set_channel_id(link_info.channel_id)
+            message_send(relay, link_info.connection)
 
     def announce(self, msg: str) -> None:
         """

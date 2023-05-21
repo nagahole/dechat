@@ -6,12 +6,19 @@ command to their functions
 import os
 import socket
 import time
+import threading
 from src import utilities
 from src.commons import ServerMembers
 from src.channel import Channel
 from src.message import Message
-from src.protocol import message_send
-from src.constants import SERVER_CHANNEL_ID, CONFIG_FOLDER
+from src.protocol import message_send, conn_socket_setup
+from src.constants import (
+    SERVER_CHANNEL_ID,
+    CONFIG_FOLDER,
+    LINK_FLAG,
+    UNLINK_FLAG,
+    SEP
+)
 
 PROJECT_PATH = os.getcwd()
 
@@ -267,6 +274,164 @@ def c_die(_obj: Message, _conn: socket.socket, s_mems: ServerMembers) -> None:
     s_mems.quitted = True
 
 
+def c_link(obj: Message, conn: socket.socket, s_mems: ServerMembers) -> None:
+    """
+    /link <channel name> <server host name>:<port>
+
+    Sends a link request to the target server to synchronise a room of the
+    same name between the two servers
+    """
+
+    splits = utilities.smart_split(obj.message)
+
+    if len(splits) < 3:
+        echo_conn(
+            conn, "Usage: /link <channel name> <server host name>:<port>"
+        )
+        return
+
+    channel = None
+
+    for i_channel in s_mems.channels.values():
+        if i_channel.name == splits[1]:
+            channel = i_channel
+            break
+
+    if channel is None:  # No channels with the inputted name found
+        echo_conn(conn, f"Channel {splits[1]} does not exist in this server")
+        return
+
+    hostname, port = utilities.split_hostname_port(splits[2])
+
+    if None in (hostname, port):
+        echo_conn(conn, "Invalid hostname:port")
+        return
+
+    threading.Thread(
+        target=link_thread,
+        args=(channel.id, splits[1], hostname, port, conn, s_mems)
+    ).start()
+
+
+def link_thread(channel_id: int, channel_name: str, hostname: str,
+                port: int, requester: socket.socket,
+                s_mems: ServerMembers) -> None:
+    """
+    Links in a separate thread to not block the main thread
+    """
+
+    echo_conn(requester, f"Establishing connection with {hostname}:{port}...")
+
+    successful, connection = conn_socket_setup(hostname, port)
+
+    if not successful:
+        echo_conn(requester, "Connection unsuccessful")
+        return
+
+    echo_conn(requester, "Connection successful. Sending link request")
+
+    s_mems.conns.append(connection)
+
+    request = Message(
+        channel_id,
+        "",
+        time.time(),
+        0b10,
+        SEP.join((
+            LINK_FLAG,
+            channel_name,
+            s_mems.hostname,
+            str(s_mems.port)
+        ))
+    )
+
+    message_send(request, connection)
+
+
+def c_unlink(obj: Message, conn: socket.socket,
+             s_mems: ServerMembers) -> None:
+    """
+    /unlink <channel name> <server host name>:<port>
+
+    Unlinks the channel from the target server
+    """
+    splits = utilities.smart_split(obj.message)
+
+    if len(splits) < 3:
+        echo_conn(
+            conn, "Usage: /unlink <channel name> <server host name>:<port>"
+        )
+        return
+
+    channel = None
+
+    for i_channel in s_mems.channels.values():
+        if i_channel.name == splits[1]:
+            channel = i_channel
+            break
+
+    if channel is None:  # No channels with the inputted name found
+        echo_conn(conn, f"Channel {splits[1]} does not exist in this server")
+        return
+
+    hostname, port = utilities.split_hostname_port(splits[2])
+
+    if None in (hostname, port):
+        echo_conn(conn, "Invalid hostname:port")
+        return
+
+    if channel.linked_to_channel(splits[1], hostname, port):
+        echo_conn(conn, "Unlinked channel on current end")
+        channel.unlink_channel(splits[1], hostname, port)
+
+    threading.Thread(
+        target=unlink_thread,
+        args=(channel.id, splits[1], hostname, port, conn, s_mems)
+    ).start()
+
+
+def unlink_thread(channel_id: int, channel_name: str, hostname: str,
+                port: int, requester: socket.socket,
+                s_mems: ServerMembers) -> None:
+    """
+    Links in a separate thread to not block the main thread
+    """
+
+    echo_conn(requester, f"Establishing connection with {hostname}:{port}...")
+
+    successful, connection = conn_socket_setup(hostname, port)
+
+    if not successful:
+        echo_conn(requester, "Connection unsuccessful")
+        return
+
+    echo_conn(requester, "Connection successful. Sending unlink request")
+
+    request = Message(
+        channel_id,
+        "",
+        time.time(),
+        0b10,
+        SEP.join((
+            UNLINK_FLAG,
+            channel_name,
+            s_mems.hostname,
+            str(s_mems.port)
+        ))
+    )
+
+    message_send(request, connection)
+
+
+def c_migrate(obj: Message, conn: socket.socket,
+              s_mems: ServerMembers) -> None:
+    """
+    /migrate <channel name> <server host name>:<port>
+
+    Migrates the channel to a new linked server, connected users should
+    be migrated by receiving the same command.
+    """
+
 server_command_map = {
     "motd": c_motd,
     "help": c_help,
@@ -276,5 +441,9 @@ server_command_map = {
     "create": c_create,
     "join": c_join,
     "invite": c_invite,
-    "die": c_die
+    "die": c_die,
+
+    "link": c_link,
+    "unlink": c_unlink,
+    "migrate": c_migrate
 }
