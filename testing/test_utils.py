@@ -2,8 +2,6 @@
 Dechat Testing Utils
 """
 
-import threading
-import time
 from subprocess import Popen, PIPE
 from functools import partial
 
@@ -45,28 +43,13 @@ def client_write(client, msg : str):
     client.stdin.write((msg + "\n").encode("ascii"))
     client.stdin.flush()
 
-def client_read(client, timeout: float = 0.05) -> list:
+def client_read(client) -> list:
     """
         client_read
         Reads stdout from that client
     """
 
-    response = [[[]]]
-
-    def read() -> None:
-        while True:
-            response[0][0].append(client.stdout.readline())
-
-    thread = threading.Thread(target=read)
-    thread.start()
-
-    time.sleep(timeout)
-
-    lines_str = list(map(lambda x: x.decode("utf-8"), response[0][0]))
-
-    print("response: " + "".join(lines_str))
-
-    # if len(lines_str) == 0:
-    #     return None
+    lines = client.stdout.readlines()
+    lines_str = list(map(lambda x: x.decode("utf-8"), lines))
 
     return lines_str

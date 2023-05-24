@@ -39,19 +39,28 @@ def main():
     ui_enabled = "--ui" in sys.argv
 
     client = Client(ui_enabled)
-    client.start()
+    client_thread = client.start()
+    client_thread.join()
 
 
 class Client:
     """
     Client class
     """
-    def __init__(self, ui_enabled: bool = False) -> None:
+    def __init__(self, ui_enabled: bool = False,
+                 log: callable = print) -> None:
+        """
+        Purpose of the 'log' parameter is so I can use it as a hook
+        to redirect output to be read instead of printed for testing
+        """
+
         self.quitted = False
         self.default_nickname = "anon"
         self.ui_enabled = ui_enabled
-        self.con_wrappers = {}
 
+        self.log = log
+
+        self.con_wrappers = {}
         self.current_wrapper = None
 
         self.wrappers_to_close = []
@@ -130,7 +139,7 @@ class Client:
             )
 
         if self.current_wrapper == wrapper:
-            print("Already on that server!")
+            self.log("Already on that server!")
             return
 
         if clear_terminal and self.ui_enabled:
@@ -199,26 +208,38 @@ class Client:
         wrapper.states.pinging_for_info = True
         wrapper.input_queue.insert(0, "/info")
 
-    def start(self) -> None:
+    def start(self) -> threading.Thread:
         """
-        Starts running the client
+        Starts running the client in a non-blocking way using a new
+        thread
+
+        Returns the main client thread
         """
-        threading.Thread(target=self.input_loop).start()
 
-        # Purpose of this is to join all sender and listener threads from the
-        # main thread. All wrappers should be closed from here to avoid
-        # threads trying to join with themselves
-        while not self.quitted:
+        def main_client_thread() -> None:
+            input_thread = threading.Thread(target=self.input_loop)
+            input_thread.start()
 
-            for wrapper in self.wrappers_to_close:
-                if wrapper == self.current_wrapper:
-                    self.current_wrapper = None
-                wrapper.close()
+            # Purpose of this is to join all sender and listener threads from
+            # the main thread. All wrappers should be closed from here to
+            # avoid threads trying to join with themselves
+            while not self.quitted:
 
-            self.wrappers_to_close.clear()
+                for wrapper in self.wrappers_to_close:
+                    if wrapper == self.current_wrapper:
+                        self.current_wrapper = None
+                    wrapper.close()
 
-        for thread in self.migration_threads:
-            thread.join()
+                self.wrappers_to_close.clear()
+
+            input_thread.join()
+
+            for thread in self.migration_threads:
+                thread.join()
+
+        main_thread = threading.Thread(target=main_client_thread)
+        main_thread.start()
+        return main_thread
 
     def stop(self) -> None:
         """
@@ -267,7 +288,7 @@ class Client:
                 return True
 
             if print_unrecognized_commands:
-                print(f"Command /{command} not recognized")
+                self.log(f"Command /{command} not recognized")
 
         return False
 
@@ -333,10 +354,10 @@ class Client:
 
                 if len(user_input) > 0:
                     self.handle_input_to_server(user_input, wrapper)
-                else:
+                elif wrapper.confirmed_channel_name is None:  # In bare server
                     empty_message = True
 
-            if empty_message and not wrapper.states.is_closed():
+            if empty_message and not wrapper.is_closed():
                 message_send(CLOSE_MESSAGE, wrapper.connection)
 
         # Should only come to this point when the connection to the server
@@ -429,14 +450,14 @@ class Client:
         """
 
         if self.ui_enabled:
-            print("\r" + string, end="")
+            self.log("\r" + string, end="")
             sys.stdout.flush()
             if print_prompt and self.printed_prompt:
-                print(f"\n{INPUT_PROMPT}", end="")
+                self.log(f"\n{INPUT_PROMPT}", end="")
             else:
-                print()
+                self.log()
         else:
-            print(string)
+            self.log(string)
 
     def process_received_message(self, message: Message,
                                  wrapper: ClientConnectionWrapper,

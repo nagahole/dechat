@@ -45,4 +45,4 @@ push:
 	@git push https://github.com/nagahole/dechat
 
 run_tests:
-	python3 test/base_tests.py
+	python3 testing/base_tests.py

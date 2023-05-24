@@ -8,7 +8,7 @@ from src.message import Message
 # YOU WILL NEED TO MODIFY THESE FUNCTIONS TO SUIT THE HEADER FORMAT IN THE SPEC
 
 
-DO_LOG = True
+DO_LOG = False
 
 
 def log(*args, **kwargs):

@@ -2,10 +2,12 @@
 Testcases for dechat
 """
 
-import time
 import unittest
-from rick_utils import execute_await, execute_await_raw, connect
-from test_utils import start_server, start_client, client_write
+import sys
+sys.path.append("..")
+from .. import client
+from testing.rick_utils import execute_await, ClientWrapper
+from testing.test_utils import start_server
 
 servers = [
     ("localhost", 9996),
@@ -23,7 +25,7 @@ class BaseDechatTest(unittest.TestCase):
         Setup
         """
         print("Starting up client")
-        self.client = start_client()
+        self.client = ClientWrapper(client.Client(ui_enabled=False))
 
     def tearDown(self):
         """
@@ -33,7 +35,7 @@ class BaseDechatTest(unittest.TestCase):
         # Just to make sure absolutely has quit from channel to server to
         # bare client to exit
         for _ in range(3):
-            client_write(self.client, "/quit")
+            self.client.feed_input("/quit")
 
     def test_hello_world(self):
         """
@@ -42,16 +44,16 @@ class BaseDechatTest(unittest.TestCase):
         print("Test hello world")
 
         execute_await(
-            lambda: connect(self.client, servers[0]),
+            f"/connect {servers[0][0]}:{servers[0][1]}",
             self.client,
             throw_error=False
         )
 
-        execute_await_raw(
+        execute_await(
             "/create hello_world", self.client, throw_error=False
         )
 
-        response = execute_await_raw(
+        response = execute_await(
             "Hello world!", self.client, throw_error=False
         )
 

@@ -43,11 +43,11 @@ def c_connect(user_input: str, client) -> None:
         if utilities.is_integer(splits[2]):
             display_num = int(splits[2])
         else:
-            print(f"{splits[2]} is an invalid display num")
+            client.log(f"{splits[2]} is an invalid display num")
             return
 
     if display_num in client.con_wrappers:
-        print(f"{display_num} is already a display number!")
+        client.log(f"{display_num} is already a display number!")
         return
 
     hostname, port = utilities.split_hostname_port(splits[1])
@@ -55,12 +55,9 @@ def c_connect(user_input: str, client) -> None:
     if None in (hostname, port):
         return
 
-    print("Connecting to server...")
-    print("Bruh")
+    client.log("Connecting to server...")
 
     successful, connection = conn_socket_setup(hostname, port)
-
-    print("Bruh bruh\nBuhr\nBruh")
 
     if successful:
         wrapper = ClientConnectionWrapper(connection)
@@ -69,7 +66,7 @@ def c_connect(user_input: str, client) -> None:
             wrapper, clear_terminal=False, ping_for_info=True
         )
     else:
-        print(f"Failed to connect to server {hostname}:{port}")
+        client.log(f"Failed to connect to server {hostname}:{port}")
 
 
 def c_quit(_user_input: str, client) -> None:
@@ -93,10 +90,10 @@ def c_nick(user_input: str, client) -> None:
     new_nick = splits[1]
 
     if len(new_nick) > MAX_NICK_LENGTH:
-        print(f"Maximum nickname length is {MAX_NICK_LENGTH}")
+        client.log(f"Maximum nickname length is {MAX_NICK_LENGTH}")
     else:
         client.default_nickname = new_nick
-        print(f"Default nickname set to {new_nick}")
+        client.log(f"Default nickname set to {new_nick}")
 
 
 def cs_reply(user_input: str, client) -> None:
@@ -111,11 +108,11 @@ def cs_reply(user_input: str, client) -> None:
     splits = utilities.smart_split(user_input)
 
     if len(splits) < 2:
-        print("Usage: /reply <message>")
+        client.log("Usage: /reply <message>")
         return
 
     if not wrapper.states.last_whisperer:
-        print("No one messaged you recently!")
+        client.log("No one messaged you recently!")
         return
 
     msg = user_input.split(' ', 1)[1].strip()
@@ -135,7 +132,7 @@ def cs_quit(user_input: str, client) -> None:
     wrapper = client.current_wrapper
 
     if not wrapper.states.in_channel:
-        print("Disconnecting from server...")
+        client.log("Disconnecting from server...")
 
     # Not gonna send close message here as to not block
     wrapper.input_queue.insert(0, user_input)
@@ -162,7 +159,7 @@ def cs_connect(user_input: str, client) -> None:
 
     for i_wrapper in client.con_wrappers.values():
         if f"{hostname}:{port}" == i_wrapper.name:
-            print(f"Already in {hostname}:{port}")
+            client.log(f"Already in {hostname}:{port}")
             return
 
     display_num = None
@@ -171,11 +168,11 @@ def cs_connect(user_input: str, client) -> None:
         if utilities.is_integer(splits[2]):
             display_num = int(splits[2])
         else:
-            print(f"{splits[2]} is an invalid display number")
+            client.log(f"{splits[2]} is an invalid display number")
             return
 
     if display_num in client.con_wrappers:
-        print(f"{display_num} is already a display number!")
+        client.log(f"{display_num} is already a display number!")
         return
 
     successful, connection = conn_socket_setup(hostname, port)
@@ -183,10 +180,10 @@ def cs_connect(user_input: str, client) -> None:
     if successful and client.ui_enabled:
         ansi.clear_terminal()
 
-    print("Connecting to server...")
+    client.log("Connecting to server...")
 
     if not successful:
-        print(f"Failed to connect to server {hostname}:{port}")
+        client.log(f"Failed to connect to server {hostname}:{port}")
     else:
         new_wrapper = ClientConnectionWrapper(connection)
 
@@ -217,7 +214,7 @@ def m_list_displays(_user_input: str, client) -> None:
     wrapper = client.current_wrapper
 
     if len(client.con_wrappers) == 0:
-        print("Not connected to any server")
+        client.log("Not connected to any server")
         return
 
     # Sorts by id in increasing order
@@ -240,7 +237,7 @@ def m_list_displays(_user_input: str, client) -> None:
 
         echo += postfix
 
-        print(echo)
+        client.log(echo)
 
 
 def m_display(user_input: str, client) -> None:
@@ -262,9 +259,9 @@ def m_display(user_input: str, client) -> None:
         if display_num in client.con_wrappers:
             client.change_display(display_num, ping_for_info=False)
         else:
-            print(f"No display on {display_num}")
+            client.log(f"No display on {display_num}")
     else:
-        print("Please enter a number for display [#]")
+        client.log("Please enter a number for display [#]")
 
 
 client_command_map = {
@@ -289,7 +286,7 @@ multicon_client_command_map = {
 # but haven't switched to display them yet
 limbo_command_map = {
     "connect": c_connect,
-    "quit": lambda *args, **kwargs: print("Display a server to quit"),
+    "quit": lambda _, client: client.log("Display a server to quit"),
     "list_displays": m_list_displays,
     "display": m_display
 }
