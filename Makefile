@@ -44,5 +44,5 @@ push:
 	@git push git.edstem.org:challenge/85943/assignment-2-dechat
 	@git push https://github.com/nagahole/dechat
 
-ngrok:
-	@ngrok tcp 5001
+run_tests:
+	python3 test/base_tests.py

@@ -10,7 +10,7 @@ from src import ansi
 from src import utilities
 from src.message import Message, CLOSE_MESSAGE
 from src.protocol import message_send, message_recv, bind_socket_setup
-from src.commons import ServerMembers, ChannelLinkInfo
+from src.commons import ServerMembers, ChannelLinkInfo, ServerConnectionInfo
 from src.commands.server_commands import server_command_map, echo_conn
 from src.constants import (
     SERVER_CHANNEL_ID,
@@ -33,7 +33,7 @@ def main():
         Entrypoint for the server
     """
 
-    tickrate = 8
+    tickrate = 32
     port = 9996
     host = "localhost"
 
@@ -82,7 +82,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
         try:  # Check for a new connection
             connection, addr = sock.accept()
             connection.settimeout(0.1)
-            s_mems.conns.append(connection)
+            s_mems.conns.append(ServerConnectionInfo(connection))
 
             server_command_map["motd"](None, connection, s_mems)
 
@@ -99,7 +99,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
             try:  # Check if any data has been passed in and print it
 
-                message_obj = message_recv(s_mems.conns[i])
+                message_obj = message_recv(s_mems.conns[i].connection)
 
                 print(f"RECV: {message_obj}")
 
@@ -119,7 +119,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
                 print("Closing user " + str(i))
 
-                conn = s_mems.conns.pop(i)
+                conn = s_mems.conns.pop(i).connection
 
                 if conn in s_mems.conn_channel_map:
                     channel = s_mems.conn_channel_map[conn]
@@ -138,7 +138,8 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
             if isinstance(message_obj, Message) and not connection_closed:
 
                 msg = message_obj.message
-                conn = s_mems.conns[i]
+                conn_info = s_mems.conns[i]
+                conn = conn_info.connection
 
                 if message_obj.message_type not in (0b11, 0b10):
 
@@ -172,6 +173,8 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                             echo_conn(conn, "Command not recognized")
 
                 elif message_obj.message_type == 0b10:
+
+                    conn_info.is_server = True
 
                     if msg.startswith(LINK_FLAG):
                         # Channel linkage requests
@@ -264,9 +267,18 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
                 elif message_obj.message_type == 0b11:
                     # / Cross server channel synchronisation
-                    channel = s_mems.channels[message_obj.channel_id]
-                    message_obj.set_message_type(0b00)
-                    channel.broadcast_message(message_obj, is_relay=True)
+
+                    conn_info.is_server = True
+
+                    if message_obj.channel_id in s_mems.channels:
+                        channel = s_mems.channels[message_obj.channel_id]
+                        message_obj.set_message_type(0b00)
+                        channel.broadcast_message(message_obj)
+                    else:
+                        print(
+                            "WARNING: Attempt to relay to a channel that "
+                            f"doesn't exist (id:{message_obj.channel_id})"
+                        )
 
             i += 1
 

@@ -6,21 +6,17 @@ different "stages" of client commands
 
 from src import ansi
 from src import utilities
-from src.message import CLOSE_MESSAGE
 from src.commons import (
     ClientConnectionWrapper,
 )
-from src.protocol import conn_socket_setup, message_send
+from src.protocol import conn_socket_setup
 from src.constants import MAX_NICK_LENGTH
-
-
 
 # Prefix meanings:
 
 # - c: client
 # - cs: client sender
 # - m: mutual
-
 
 
 def c_c(_user_input: str, client) -> None:
@@ -60,8 +56,11 @@ def c_connect(user_input: str, client) -> None:
         return
 
     print("Connecting to server...")
+    print("Bruh")
 
     successful, connection = conn_socket_setup(hostname, port)
+
+    print("Bruh bruh\nBuhr\nBruh")
 
     if successful:
         wrapper = ClientConnectionWrapper(connection)
@@ -79,7 +78,7 @@ def c_quit(_user_input: str, client) -> None:
 
     Quits the client
     """
-    client.quitted = True
+    client.stop()
 
 
 def c_nick(user_input: str, client) -> None:
@@ -100,34 +99,32 @@ def c_nick(user_input: str, client) -> None:
         print(f"Default nickname set to {new_nick}")
 
 
-def cs_reply(user_input: str, _client,
-             wrapper: ClientConnectionWrapper) -> None:
+def cs_reply(user_input: str, client) -> None:
     """
     CLIENT SENDER COMMAND
 
     Implicitly calls /msg to the last whisperer to this client
     """
 
+    wrapper = client.current_wrapper
+
     splits = utilities.smart_split(user_input)
 
     if len(splits) < 2:
         print("Usage: /reply <message>")
-        wrapper.message_obj = None
         return
 
     if not wrapper.states.last_whisperer:
         print("No one messaged you recently!")
-        wrapper.message_obj = None
         return
 
     msg = user_input.split(' ', 1)[1].strip()
     echo = f"/msg {wrapper.states.last_whisperer} {msg}"
 
-    wrapper.message_obj.set_message(echo)
+    wrapper.input_queue.append(echo)
 
 
-def cs_quit(_user_input: str, _client,
-            wrapper: ClientConnectionWrapper) -> None:
+def cs_quit(user_input: str, client) -> None:
     """
     CLIENT SENDER COMMAND
 
@@ -135,17 +132,16 @@ def cs_quit(_user_input: str, _client,
     Quits server if not in a channel
     """
 
+    wrapper = client.current_wrapper
+
     if not wrapper.states.in_channel:
         print("Disconnecting from server...")
-        message_send(CLOSE_MESSAGE, wrapper.connection)
-        wrapper.close()
-    else:  # Is in channel and quitting the channel
-        wrapper.channel_name = None
-        wrapper.states.in_channel = False
+
+    # Not gonna send close message here as to not block
+    wrapper.input_queue.insert(0, user_input)
 
 
-def cs_connect(user_input: str, client,
-               wrapper: ClientConnectionWrapper) -> None:
+def cs_connect(user_input: str, client) -> None:
 
     """
     CLIENT SENDER COMMAND
@@ -153,9 +149,6 @@ def cs_connect(user_input: str, client,
     Connects to a new server. If multi-con not enabled leaves the previous
     one, else appends to the connection dictionary
     """
-
-    if wrapper is not None:
-        wrapper.message_obj = None
 
     splits = utilities.smart_split(user_input)
 
@@ -166,6 +159,11 @@ def cs_connect(user_input: str, client,
 
     if hostname is None or port is None:
         return
+
+    for i_wrapper in client.con_wrappers.values():
+        if f"{hostname}:{port}" == i_wrapper.name:
+            print(f"Already in {hostname}:{port}")
+            return
 
     display_num = None
 
@@ -190,13 +188,12 @@ def cs_connect(user_input: str, client,
     if not successful:
         print(f"Failed to connect to server {hostname}:{port}")
     else:
-
         new_wrapper = ClientConnectionWrapper(connection)
 
         # Close every other connection to servers if multi-con not enabled
         if not client.ui_enabled:
             for i_wrapper in client.con_wrappers.values():
-                i_wrapper.close()
+                client.wrappers_to_close.append(i_wrapper)
             client.con_wrappers.clear()
 
         client.add_wrapper(new_wrapper, display_num)
@@ -207,8 +204,7 @@ def cs_connect(user_input: str, client,
 
 # The _ parameter is there just to make the function signature work with both
 # client commands and client sender commands
-def m_list_displays(_user_input: str, client,
-                    wrapper: ClientConnectionWrapper = None) -> None:
+def m_list_displays(_user_input: str, client) -> None:
     """
     MUTUAL COMMAND
 
@@ -216,13 +212,15 @@ def m_list_displays(_user_input: str, client,
     and joined channel (if it exists)
     """
 
-    if wrapper is not None:
-        wrapper.message_obj = None
+    client.clear_closed_wrappers()
+
+    wrapper = client.current_wrapper
 
     if len(client.con_wrappers) == 0:
         print("Not connected to any server")
         return
 
+    # Sorts by id in increasing order
     sorted_items = sorted(client.con_wrappers.items(), key=lambda kv: kv[0])
 
     for key, i_wrapper in sorted_items:
@@ -236,26 +234,21 @@ def m_list_displays(_user_input: str, client,
 
         echo = f"{key} : {name}"
 
-        if (not i_wrapper.states.joining_channel and
-           i_wrapper.channel_name is not None):
+        if i_wrapper.confirmed_channel_name is not None:
 
-            echo += f" | {i_wrapper.channel_name}"
+            echo += f" | {i_wrapper.confirmed_channel_name}"
 
         echo += postfix
 
         print(echo)
 
 
-def m_display(user_input: str, client,
-              wrapper: ClientConnectionWrapper = None) -> None:
+def m_display(user_input: str, client) -> None:
     """
     MUTUAL COMMAND
 
     Displays the specified numbered connection
     """
-
-    if wrapper is not None:
-        wrapper.message_obj = None
 
     splits = utilities.smart_split(user_input)
 
@@ -305,7 +298,7 @@ limbo_command_map = {
 client_sender_command_map = {
     "reply": cs_reply,
     "quit": cs_quit,
-    "connect": cs_connect,
+    "connect": cs_connect
 }
 
 

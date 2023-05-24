@@ -11,7 +11,7 @@ class AliasDictionary:
     access a channel by its name and the protocol needing to be
     able to access a channel by its id
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         self.dict = dict(*args, **kwargs)
         self.aliases = {}
 
@@ -26,12 +26,41 @@ class AliasDictionary:
 
         raise KeyError(f"{key} not found")
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         # Will get the key an alias points to if exists, otherwise
         # will try to access the base dictionary with just the given key
         key = self.aliases.get(key, key)
 
         self.dict[key] = value
+
+    def __delitem__(self, key):
+        """
+        Recursively deletes all keys and aliases
+        """
+
+        recurse = False
+
+        aliased_key = self.aliases.get(key, key)
+
+        if aliased_key == key:  # Key to delete is direct key not alias
+            del self.dict[aliased_key]
+        else:  # Key to delete is an alias
+            recurse = True
+            del self.aliases[key]
+
+        marked_for_deletion = set()
+
+        # Deletes all aliases that points to this key
+        # Need separate loops because cannot delete items as you iterate
+        for alias, i_key in self.aliases.items():
+            if aliased_key == i_key:
+                marked_for_deletion.add(alias)
+
+        for alias in marked_for_deletion:
+            del self.aliases[alias]
+
+        if recurse:
+            self.__delitem__(aliased_key)
 
     def __iter__(self):
         """
@@ -50,10 +79,10 @@ class AliasDictionary:
 
         return iter(all_keys)
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         return key in self.aliases or key in self.dict
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dict)
 
     def values(self):
@@ -62,7 +91,7 @@ class AliasDictionary:
         """
         return self.dict.values()
 
-    def add_alias(self, key, alias):
+    def add_alias(self, key, alias) -> None:
         """
         Binds an alias to a key
         """

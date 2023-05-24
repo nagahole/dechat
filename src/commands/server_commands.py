@@ -8,7 +8,7 @@ import socket
 import time
 import threading
 from src import utilities
-from src.commons import ServerMembers
+from src.commons import ServerMembers, ServerConnectionInfo
 from src.channel import Channel
 from src.message import Message
 from src.protocol import message_send, conn_socket_setup
@@ -17,6 +17,7 @@ from src.constants import (
     CONFIG_FOLDER,
     LINK_FLAG,
     UNLINK_FLAG,
+    MIGRATE_FLAG,
     SEP
 )
 
@@ -32,7 +33,6 @@ def echo_conn(conn: socket.socket, message: str) -> None:
     message_obj = Message(SERVER_CHANNEL_ID, "", time.time(),
                           0b01, message)
 
-    print(f"Sending: {message_obj}")
     message_send(message_obj, conn)
 
 
@@ -86,6 +86,8 @@ def c_motd(_obj: Message, conn: socket.socket,
         with open(file_path, "r", encoding="ascii") as file:
 
             echo_conn(conn, file.read())
+    else:
+        echo_conn(conn, "Server has no MOTD file")
 
 
 def c_help(_obj: Message, conn: socket.socket,
@@ -101,6 +103,8 @@ def c_help(_obj: Message, conn: socket.socket,
         with open(file_path, "r", encoding="ascii") as file:
 
             echo_conn(conn, file.read())
+    else:
+        echo_conn(conn, "Server has no HELP file")
 
 
 def c_rules(_obj: Message, conn: socket.socket,
@@ -116,6 +120,8 @@ def c_rules(_obj: Message, conn: socket.socket,
         with open(file_path, "r", encoding="ascii") as file:
 
             echo_conn(conn, file.read())
+    else:
+        echo_conn(conn, "Server has no RULES file")
 
 
 def c_info(_obj: Message, conn: socket.socket,
@@ -132,9 +138,11 @@ def c_info(_obj: Message, conn: socket.socket,
 
     uptime = time.time() - s_mems.created_timestamp
 
+    client_conns = list(filter(lambda i: not i.is_server, s_mems.conns))
+
     server_name = f"Server: {s_mems.hostname}:{s_mems.port}"
     channels_str = f"{len(s_mems.channels)} channels"
-    users_str = f"{len(s_mems.conns)} connected users"
+    users_str = f"{len(client_conns)} connected users"
     uptime_str = f"Uptime: {utilities.format_time_period(uptime)}"
 
     echo = "\n".join([
@@ -181,6 +189,7 @@ def c_create(obj: Message, conn: socket.socket,
     channel_name = splits[1]
 
     if channel_name in s_mems.channels:
+        echo_conn(conn, f"Channel {channel_name} already exists")
         return
 
     password = None
@@ -210,17 +219,20 @@ def c_join(obj: Message, conn: socket.socket,
     splits = utilities.smart_split(obj.message)
 
     if len(splits) < 2:
+        echo_conn(conn, "Usage: /join <channel name> [password]")
         return
 
     channel_name = splits[1]
 
     if channel_name not in s_mems.channels:  # Channel doesn't exist
+        echo_conn(conn, f"Channel {channel_name} doesn't exist")
         return
 
     channel = s_mems.channels[channel_name]
 
     # Joining the same channel
     if channel == s_mems.conn_channel_map.get(conn):
+        echo_conn(conn, f"You are already in {channel_name}!")
         return
 
     password = ""
@@ -235,6 +247,10 @@ def c_join(obj: Message, conn: socket.socket,
     if successful_join:
         channel.send_message_history(conn)
         channel.welcome(conn)
+    else:
+        echo_conn(
+            conn, f"Could not join {channel_name} (wrong password?)"
+        )
 
 
 def c_invite(obj: Message, conn: socket.socket,
@@ -243,11 +259,14 @@ def c_invite(obj: Message, conn: socket.socket,
     Invites a connection in a server to a channel
 
     Will simply echo to the invitee "You've been invited to <channel_name>"
+
+    #TODO Maybe take channel names instead of server names?
     """
 
     splits = utilities.smart_split(obj.message)
 
     if len(splits) < 3:
+        echo_conn(conn, "Usage: /invite <nickname> <channel name>")
         return
 
     target_nick = splits[1]
@@ -290,15 +309,18 @@ def c_link(obj: Message, conn: socket.socket, s_mems: ServerMembers) -> None:
         )
         return
 
+    channel_name = splits[1]
     channel = None
 
     for i_channel in s_mems.channels.values():
-        if i_channel.name == splits[1]:
+        if i_channel.name == channel_name:
             channel = i_channel
             break
 
     if channel is None:  # No channels with the inputted name found
-        echo_conn(conn, f"Channel {splits[1]} does not exist in this server")
+        echo_conn(
+            conn, f"Channel {channel_name} does not exist in this server"
+        )
         return
 
     hostname, port = utilities.split_hostname_port(splits[2])
@@ -307,9 +329,15 @@ def c_link(obj: Message, conn: socket.socket, s_mems: ServerMembers) -> None:
         echo_conn(conn, "Invalid hostname:port")
         return
 
+    if channel.linked_to_channel(channel_name, hostname, port):
+        echo_conn(
+            conn, f"Already linked with {channel_name} on {hostname}:{port}"
+        )
+        return
+
     threading.Thread(
         target=link_thread,
-        args=(channel.id, splits[1], hostname, port, conn, s_mems)
+        args=(channel.id, channel_name, hostname, port, conn, s_mems)
     ).start()
 
 
@@ -330,7 +358,7 @@ def link_thread(channel_id: int, channel_name: str, hostname: str,
 
     echo_conn(requester, "Connection successful. Sending link request")
 
-    s_mems.conns.append(connection)
+    s_mems.conns.append(ServerConnectionInfo(connection, is_server=True))
 
     request = Message(
         channel_id,
@@ -363,15 +391,18 @@ def c_unlink(obj: Message, conn: socket.socket,
         )
         return
 
+    channel_name = splits[1]
     channel = None
 
     for i_channel in s_mems.channels.values():
-        if i_channel.name == splits[1]:
+        if i_channel.name == channel_name:
             channel = i_channel
             break
 
     if channel is None:  # No channels with the inputted name found
-        echo_conn(conn, f"Channel {splits[1]} does not exist in this server")
+        echo_conn(
+            conn, f"Channel {channel_name} does not exist in this server"
+        )
         return
 
     hostname, port = utilities.split_hostname_port(splits[2])
@@ -380,19 +411,19 @@ def c_unlink(obj: Message, conn: socket.socket,
         echo_conn(conn, "Invalid hostname:port")
         return
 
-    if channel.linked_to_channel(splits[1], hostname, port):
+    if channel.linked_to_channel(channel_name, hostname, port):
         echo_conn(conn, "Unlinked channel on current end")
-        channel.unlink_channel(splits[1], hostname, port)
+        channel.unlink_channel(channel_name, hostname, port)
 
     threading.Thread(
         target=unlink_thread,
-        args=(channel.id, splits[1], hostname, port, conn, s_mems)
+        args=(channel.id, channel_name, hostname, port, conn, s_mems)
     ).start()
 
 
 def unlink_thread(channel_id: int, channel_name: str, hostname: str,
-                port: int, requester: socket.socket,
-                s_mems: ServerMembers) -> None:
+                  port: int, requester: socket.socket,
+                  s_mems: ServerMembers) -> None:
     """
     Links in a separate thread to not block the main thread
     """
@@ -431,6 +462,82 @@ def c_migrate(obj: Message, conn: socket.socket,
     Migrates the channel to a new linked server, connected users should
     be migrated by receiving the same command.
     """
+    splits = utilities.smart_split(obj.message)
+
+    if len(splits) < 3:
+        echo_conn(
+            conn, "Usage: /migrate <channel name> <server host name>:<port>"
+        )
+        return
+
+    channel_name = splits[1]
+    channel = None
+
+    for i_channel in s_mems.channels.values():
+        if i_channel.name == channel_name:
+            channel = i_channel
+            break
+
+    if channel is None:  # No channels with the inputted name found
+        echo_conn(
+            conn, f"Channel {channel_name} does not exist in this server"
+        )
+        return
+
+    hostname, port = utilities.split_hostname_port(splits[2])
+
+    if None in (hostname, port):
+        echo_conn(conn, "Invalid hostname:port")
+        return
+
+    if not channel.linked_to_channel(channel_name, hostname, port):
+        echo_conn(conn, f"Not linked to {channel_name} on {hostname}:{port}")
+        return
+
+    # Valid input
+
+    echo = (
+        f"Broadcasting to users in {channel_name} to migrate to "
+        f"{channel_name} in {hostname}:{port}"
+    )
+
+    echo_conn(conn, echo)
+
+    link_info = channel.linked_channels[(channel_name, hostname, port)]
+
+    unlink_request = Message(
+        link_info.channel_id,
+        "",
+        time.time(),
+        0b10,
+        SEP.join((
+            UNLINK_FLAG,
+            channel_name,
+            s_mems.hostname,
+            str(s_mems.port)
+        ))
+    )
+
+    message_send(unlink_request, link_info.connection)
+
+    broadcast = Message(
+        link_info.channel_id,  # This will probably be unused since channel
+        "",                    # name is also being broadcasted
+        time.time(),
+        0b10,  # Not sure about this message type??
+        SEP.join((
+            MIGRATE_FLAG,
+            channel_name,
+            link_info.hostname,
+            str(link_info.port)
+        ))
+    )
+
+    # Save message probably doesn't matter since channel is being destroyed
+    # anyways but just to be safe
+    channel.broadcast_message(broadcast, save_message=False, do_relay=False)
+    channel.destroy()
+
 
 server_command_map = {
     "motd": c_motd,

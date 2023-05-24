@@ -8,7 +8,7 @@ from src.message import Message
 # YOU WILL NEED TO MODIFY THESE FUNCTIONS TO SUIT THE HEADER FORMAT IN THE SPEC
 
 
-DO_LOG = False
+DO_LOG = True
 
 
 def log(*args, **kwargs):
@@ -26,6 +26,7 @@ def message_send(message_obj: Message, connection: socket.socket) -> bytes:
     :: msg :: A string to send
     """
     encoding = message_obj.to_bytes()
+
     connection.sendall(encoding)
 
     return encoding
@@ -53,11 +54,13 @@ def message_recv(connection: socket.socket) -> Message:
 
 # You should probably not have to touch these functions
 def bind_socket_setup(hostname: str, port: int,
-                      timeout=0.1) -> tuple[bool, socket.socket | None]:
+                      timeout=0.5) -> tuple[bool, socket.socket | None]:
     """
-        Sets up the socket
-        :: hostname : str :: hostname to bind to
-        :: port : int :: port to bind to
+    Sets up the socket
+    :: hostname : str :: hostname to bind to
+    :: port : int :: port to bind to
+
+    Returns (successful, connection)
     """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(timeout)
@@ -84,15 +87,18 @@ def bind_socket_setup(hostname: str, port: int,
 
 def conn_socket_setup(hostname: str, port: int, timeout=0.1):
     """
-        Connects to a socket
-        :: hostname : str :: hostname to connect to
-        :: port : int :: port to connect to
+    Connects to a socket
+    :: hostname : str :: hostname to connect to
+    :: port : int :: port to connect to
+
+    Returns (successful, connection)
     """
     log(f"Setting up socket at {hostname}:{port}")
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connection.settimeout(timeout)
     successful = False
     try:
+        log(f"Connecting to {hostname}:{port}")
         connection.connect((hostname, port))
         successful = True
     except ConnectionRefusedError:
@@ -103,6 +109,7 @@ def conn_socket_setup(hostname: str, port: int, timeout=0.1):
         log(str(err))
 
     if successful:
+        log("Successfully set up socket")
         return True, connection
 
     return False, None

@@ -38,8 +38,30 @@ class Channel:
         self.nickname_connection_map = {}
 
         self.linked_channels = {}
-        self.linked_messages = set()
+        self.seen_messages = set()
         self.marked_for_deletion = set()
+
+    def destroy(self) -> None:
+        """
+        Intelligently deletes the channel while removing all references to it
+        """
+
+        # If I do plan to implement auth I should make destroy also broadcast
+        # (optionally) every user quitting the channel so users know they
+        # have left the channel
+
+        del self.s_mems.channels[self.id]  # Deleting by name works too
+
+        marked_for_deletion = set()
+
+        for conn, channel in self.s_mems.conn_channel_map.items():
+            if channel == self:
+                marked_for_deletion.add(conn)
+
+        for conn in marked_for_deletion:
+            del self.s_mems.conn_channel_map[conn]
+
+        del self
 
     def get_name(self) -> str:
         """
@@ -95,7 +117,7 @@ class Channel:
 
     def link_channel(self, info: ChannelLinkInfo) -> None:
         """
-        Appends to linked_channels the connection and channel id
+        Links to a channel on another server. LINKS ONE WAY ONLY
         """
         key = (info.channel_name, info.hostname, info.port)
 
@@ -104,7 +126,7 @@ class Channel:
     def unlink_channel(self, channel_name: str, hostname: str,
                        port: int) -> None:
         """
-        Unlinks a channel from this channel.
+        Unlinks a channel from this channel. UNLINKS ONE WAY ONLY
 
         Will raise error of input is not valid
         """
@@ -173,20 +195,27 @@ class Channel:
 
             del self.connection_nickname_map[connection]
 
-    def broadcast_message(self, message_obj: Message, is_relay: bool = False):
+    def broadcast_message(self, message_obj: Message,
+                          save_message: bool = True, do_relay: bool = True):
         """
         Echoes a message of type to all connections in the channel
         """
-        if is_relay and message_obj in self.linked_messages:
 
-            print("Caught repeat message")
+        # This has 2 purposes:
+        # 1. Making handling repeat messages channel id agnostic
+        # 2. In case the client needs to know which channel the message came
+        # from
+        message_obj.set_channel_id(self.id)
+
+        if message_obj in self.seen_messages:
 
             if message_obj not in self.marked_for_deletion:
 
                 self.marked_for_deletion.add(message_obj)
 
                 def callback() -> None:
-                    self.linked_messages.remove(message_obj)
+                    if message_obj in self.seen_messages:
+                        self.seen_messages.remove(message_obj)
                     self.marked_for_deletion.remove(message_obj)
 
                 # Gives some time for linked messages to circulate around
@@ -196,23 +225,34 @@ class Channel:
 
             return
 
-        self.linked_messages.add(message_obj)
+        self.seen_messages.add(message_obj)
 
-        self.messages.insert(0, message_obj)
+        def cleanup() -> None:
+            # If this message isn't relayed back and hence will never
+            # be marked for deletion otherwise
+            if message_obj in self.seen_messages:
+                self.seen_messages.remove(message_obj)
 
-        if len(self.messages) > self.messages_to_store:
-            self.messages = self.messages[:self.messages_to_store]
+        threading.Timer(20, cleanup).start()
+
+        if save_message:
+            self.messages.insert(0, message_obj)
+
+            if len(self.messages) > self.messages_to_store:
+                self.messages = self.messages[:self.messages_to_store]
 
         for conn in self.connections:
             message_send(message_obj, conn)
 
-        relay = message_obj.copy()
+        if do_relay:
 
-        relay.set_message_type(0b11)
+            relay = message_obj.copy()
 
-        for link_info in self.linked_channels.values():
-            relay.set_channel_id(link_info.channel_id)
-            message_send(relay, link_info.connection)
+            relay.set_message_type(0b11)
+
+            for link_info in self.linked_channels.values():
+                relay.set_channel_id(link_info.channel_id)
+                message_send(relay, link_info.connection)
 
     def announce(self, msg: str) -> None:
         """
@@ -362,8 +402,8 @@ class Channel:
 
                         nick_field = f"{sender_name} -> {target_name}"
 
-                        message_obj = Message(self.id, nick_field, time.time(),
-                                              0b00, message)
+                        message_obj = Message(self.id, nick_field,
+                                              time.time(), 0b00, message)
 
                         message_send(message_obj, connection)
                         message_send(message_obj, target_conn)

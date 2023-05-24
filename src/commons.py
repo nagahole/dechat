@@ -2,6 +2,7 @@
 Common information containers to be used between files
 """
 
+
 import socket
 import time
 from src.alias_dictionary import AliasDictionary
@@ -30,10 +31,20 @@ class ServerMembers:
         self.quitted = False
 
 
+class ServerConnectionInfo:
+    """
+    Information wrapper for connections on server-side
+    """
+    def __init__(self, connection: socket.socket,
+                 is_server: bool = False) -> None:
+        self.connection = connection
+        self.is_server = is_server
+
+
 class ClientStates:
     """
     Saves information for state to be shared between the main thread and
-    listener thread in client.py
+    listener and sender threads in client.py
     """
     def __init__(self, listening: bool = True, last_whisperer: str = None,
                  in_channel: bool = False, active: bool = False) -> None:
@@ -43,8 +54,6 @@ class ClientStates:
         self.active = active
 
         self.pinging_for_info = False
-        self.joining_channel = False
-        self.sender_started = False
 
     # For debugging purposes
     def __str__(self) -> str:
@@ -53,8 +62,7 @@ class ClientStates:
             f"Last whisperer: {self.last_whisperer}",
             f"In channel: {self.in_channel}",
             f"Active: {self.active}",
-            f"Pinging for info: {self.pinging_for_info}",
-            f"Joining channel: {self.joining_channel}"
+            f"Pinging for info: {self.pinging_for_info}"
         ))
 
 
@@ -68,30 +76,64 @@ class ClientConnectionWrapper:
 
         self.connection = connection
         self.name = None
-        self.channel_name = None
+        self.confirmed_channel_name = None
+        self.pending_channel_name = None
+
         self.listener = None
+        self.sender = None
+
+        self.input_queue = []
         self.states = ClientStates()
 
-        self.message_obj = Message()
         self.messages_to_store = messages_to_store
         self.messages = []
-        self.closed = False
+
+        # This is the only attribute that should never be accessed directly
+        # because it should only be set to false when .close() is called
+        self._closed = False
+
+    def is_closed(self) -> bool:
+        """
+        Safely checks whether connection is closed or not
+        """
+        return self._closed
+
+    def close_listener(self) -> None:
+        """
+        Should not be called by the listener thread
+        """
+        self.states.listening = False
+        self.listener.join()
+        self.listener = None
+
+    def close_sender(self) -> None:
+        """
+        Should not be called by the sender thread
+        """
+        self.sender.join()
+        self.sender = None
 
     def close(self) -> None:
         """
-        Closes the connection and its associated listener
+        Closes the connection and its associated senders and listeners
+
+        Listeners and senders should never call this function because
+        closing attempts to .join() the listener and sender threads to the
+        thread that called close()
         """
-        if self.states is not None:
-            self.states.listening = False
-            self.states.active = False
+
+        self._closed = True
+        self.states.active = False
 
         if self.listener is not None:
-            self.listener.join()
+            self.close_listener()
+
+        if self.sender is not None:
+            self.close_sender()
 
         if self.connection is not None:
             self.connection.close()
-
-        self.closed = True
+            self.connection = None
 
     def store_message(self, message_obj: Message) -> None:
         """
