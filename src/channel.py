@@ -196,7 +196,8 @@ class Channel:
             del self.connection_nickname_map[connection]
 
     def broadcast_message(self, message_obj: Message,
-                          save_message: bool = True, do_relay: bool = True):
+                          save_message: bool = True, do_relay: bool = True,
+                          is_relay: bool = False):
         """
         Echoes a message of type to all connections in the channel
         """
@@ -207,7 +208,7 @@ class Channel:
         # from
         message_obj.set_channel_id(self.id)
 
-        if message_obj in self.seen_messages:
+        if is_relay and message_obj in self.seen_messages:
 
             if message_obj not in self.marked_for_deletion:
 
@@ -309,7 +310,7 @@ class Channel:
 
                         if len(new_nick) <= MAX_NICK_LENGTH:
 
-                            self.set_nickname(connection, new_nick)
+                            new_nick = self.set_nickname(connection, new_nick)
 
                 case "list":
 

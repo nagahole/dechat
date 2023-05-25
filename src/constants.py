@@ -16,7 +16,5 @@ UNLINK_FLAG = "--unlink"
 
 MIGRATE_FLAG = "--migrate"
 
-ORIGIN_FLAG = "--origin"
-
 # Unit separator. Safe way to separate data in formatted strings
 SEP = chr(31)

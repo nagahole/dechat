@@ -15,9 +15,10 @@ from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from client import Client
 
-DEFAULT_PERIOD = 0.5
-DEFAULT_TIMEOUT = 1
-OUTPUT_FILE = "testing/test_logs.txt"
+DEFAULT_PERIOD = 0.08
+DEFAULT_TIMEOUT = 5
+OUTPUT_FILE = "test/test_logs.txt"
+
 SERVERS: list[tuple[str, int]] = [
     ("localhost", 9996),
     ("localhost", 9997),
@@ -27,6 +28,14 @@ SERVERS: list[tuple[str, int]] = [
 
 server_instances = []
 
+DO_LOG = False
+
+def log(*args, **kwargs) -> None:
+    """
+    Log
+    """
+    if DO_LOG:
+        print(*args, **kwargs)
 
 class ClientWrapper:
     """
@@ -73,19 +82,22 @@ class ClientWrapper:
         self._all_lines.append(evaluated_string)
         self._buffer_lines.append(evaluated_string)
 
-    def feed_input(self, inpt: str) -> None:
+    def feed_input(self, inpt: str, do_log: bool = True) -> None:
         """
         Middleman for making the client handle an input
         """
+        if do_log:
+            print(f"Executing '{inpt}'")
         self.client.handle_input(inpt)
 
     def stop(self) -> None:
         """
         Stops the client
         """
-        while not self.client._quitted:
-            self.feed_input("/quit")
-            time.sleep(0.05)
+        for wrapper in self.client.con_wrappers.values():
+            self.client.wrappers_to_close.append(wrapper)
+
+        self.client.stop()
 
 
 class DechatTestcase(unittest.TestCase):
@@ -101,6 +113,15 @@ class DechatTestcase(unittest.TestCase):
         print("Starting servers")
         for hostname, port in SERVERS:
             server_instances.append(start_server(hostname, port))
+
+        time.sleep(0.5)  # Gives time for servers to start
+
+        for server in server_instances:
+            poll = server.poll()
+            if poll is not None:  # Finished running
+                for server in server_instances:
+                    server.kill()
+                raise RuntimeError("Failure to start server")
 
     @staticmethod
     def tearDownClass() -> None:
@@ -120,16 +141,48 @@ class DechatTestcase(unittest.TestCase):
         )
 
     @staticmethod
-    def write_client_lines(client: ClientWrapper) -> None:
+    def create_clients(num: int,
+                       ui_enabled: bool = False) -> list[ClientWrapper]:
+        """
+        Creates multiple client wrappers and returns them all
+        """
+        clients = []
+        for _ in range(num):
+            clients.append(DechatTestcase.create_client(ui_enabled))
+        return clients
+
+    @staticmethod
+    def connect(client: ClientWrapper, server: tuple[str, int],
+                throw_error: bool = True) -> None:
+        """
+        Helepr function to connect clients to a server
+        """
+        execute_await(
+            f"/connect {server[0]}:{server[1]}",
+            client,
+            throw_error=throw_error
+        )
+
+    @staticmethod
+    def write_client_lines(*clients: tuple[ClientWrapper],
+                           auto_close: bool = True) -> None:
         """
         Writes client wrapper logs
         """
         with open(OUTPUT_FILE, "a", encoding="ascii") as file:
-            nick = client.client.default_nickname
-            file.write(f"Client {nick} contents")
-            file.write("\n".join(client.get_all_lines()))
-            file.write("\n")
-            file.write(f"End of {nick} contents")
+            for i, client in enumerate(clients):
+                nick = client.client.default_nickname
+                file.write(f"[Client {nick} contents]".center(80) + "\n")
+                file.write("\n".join(client.get_all_lines()))
+                file.write("\n")
+                file.write(f"[End of {nick} contents]".center(80) + "\n")
+
+                if i < len(clients) - 1:
+                    file.write(("-" * 80) + "\n")
+
+        if auto_close:
+            for client in clients:
+                client.stop()
 
     def setUp(self):
         """
@@ -138,11 +191,7 @@ class DechatTestcase(unittest.TestCase):
         testcase_str = f"TESTCASE [{self._testMethodName}]"
 
         with open(OUTPUT_FILE, "a", encoding="ascii") as file:
-            file.write(testcase_str + "\n")
-
-        self.client = ClientWrapper(
-            Client(ui_enabled=False, testing_mode=True)
-        )
+            file.write(testcase_str.center(80, "=") + "\n")
 
         print(testcase_str)
 
@@ -150,17 +199,15 @@ class DechatTestcase(unittest.TestCase):
         """
         Destructor
         """
-        DechatTestcase.write_client_lines(self.client)
         with open(OUTPUT_FILE, "a", encoding="ascii") as file:
-            file.write("END OF TESTCASE\n")
-        self.client.stop()
+            file.write("END OF TESTCASE".center(80, "=") + "\n")
         print("END OF TESTCASE")
 
 
 def execute_await(inpt: str, client_wrapper: ClientWrapper,
                   period: float = DEFAULT_PERIOD,
                   timeout: float = DEFAULT_TIMEOUT,
-                  throw_error: bool = True) -> str:
+                  throw_error: bool = True) -> list[str]:
     """
     Automatically handles storing initial lines
 
@@ -169,8 +216,22 @@ def execute_await(inpt: str, client_wrapper: ClientWrapper,
     Returns response
     """
 
+    return execute_sequence_await(
+        [inpt], client_wrapper, period, timeout, throw_error
+    )
+
+
+def execute_sequence_await(inputs: list[str], client_wrapper: ClientWrapper,
+                           period: float = DEFAULT_PERIOD,
+                           timeout: float = DEFAULT_TIMEOUT,
+                           throw_error: bool = True) -> list[str]:
+    """
+    Executes a sequence of commands then awaits response
+    """
     client_wrapper.clear_buffer()
-    client_wrapper.feed_input(inpt)
+
+    for inpt in inputs:
+        client_wrapper.feed_input(inpt)
 
     response = await_response(
         client_wrapper, period, timeout, buffer_cleared=True
@@ -178,7 +239,7 @@ def execute_await(inpt: str, client_wrapper: ClientWrapper,
 
     if response is None and throw_error:
         raise RuntimeError(
-            f"No response received from \"{inpt}\"(timeout {timeout})"
+            f"No response received from inputs (timeout {timeout})"
         )
 
     return response
@@ -193,6 +254,8 @@ def await_response(client_wrapper: ClientWrapper,
 
     Returns response if received else None
     """
+
+    log("Awaiting")
 
     if not buffer_cleared:
         client_wrapper.clear_buffer()
@@ -213,11 +276,15 @@ def await_response(client_wrapper: ClientWrapper,
 
     logs = None
 
+    start = time.time()
+
     while not state[0][0]:
 
         buffer = client_wrapper.get_buffer()
 
         if len(buffer) > 0:  # First contact
+
+            log("First contact")
             state[0][0] = True
             logs = buffer
 
@@ -241,12 +308,13 @@ def await_response(client_wrapper: ClientWrapper,
                 buffer = client_wrapper.get_buffer()
 
                 if len(buffer) > 0:
+
+                    log("Additional contact")
+
                     logs += buffer
                     client_wrapper.clear_buffer()
                     n_state[1][0] = time.time()
 
-            n_thread.join()
-
-    thread.join()
+    log(f"Total wait: {time.time() - start}")
 
     return logs

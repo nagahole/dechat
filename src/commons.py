@@ -46,20 +46,19 @@ class ClientStates:
     Saves information for state to be shared between the main thread and
     listener and sender threads in client.py
     """
-    def __init__(self, listening: bool = True, last_whisperer: str = None,
+    def __init__(self, listening: bool = True,
                  in_channel: bool = False, active: bool = False) -> None:
         self.listening = listening
-        self.last_whisperer = last_whisperer
         self.in_channel = in_channel
         self.active = active
 
         self.pinging_for_info = False
+        self.just_messaged = True
 
     # For debugging purposes
     def __str__(self) -> str:
         return "\n".join((
             f"Listening: {self.listening}",
-            f"Last whisperer: {self.last_whisperer}",
             f"In channel: {self.in_channel}",
             f"Active: {self.active}",
             f"Pinging for info: {self.pinging_for_info}"
@@ -75,6 +74,8 @@ class ClientConnectionWrapper:
                  messages_to_store: int = 50) -> None:
 
         self.connection = connection
+        self.last_whisperer = None
+
         self.name = None
         self.confirmed_channel_name = None
         self.pending_channel_name = None

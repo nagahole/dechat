@@ -6,6 +6,7 @@
 import socket
 import time
 import sys
+import threading
 from src import ansi
 from src import utilities
 from src.message import Message, CLOSE_MESSAGE
@@ -33,7 +34,7 @@ def main():
         Entrypoint for the server
     """
 
-    tickrate = 32
+    tickrate = 128
     port = 9996
     host = "localhost"
 
@@ -75,21 +76,29 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
     s_mems = ServerMembers(hostname, port)
 
+    def accept_new_connections() -> None:
+        while not s_mems.quitted:
+            try:  # Check for a new connection
+                connection, addr = sock.accept()
+                connection.settimeout(0.05)
+                s_mems.conns.append(ServerConnectionInfo(connection))
+
+                server_command_map["motd"](None, connection, s_mems)
+
+                print(f"New Connection! {addr}")
+
+            except socket.timeout:
+                pass
+
+    accept_connections_thread = threading.Thread(
+        target=accept_new_connections
+    )
+
+    accept_connections_thread.start()
+
     while not s_mems.quitted:
 
         prev = time.time()
-
-        try:  # Check for a new connection
-            connection, addr = sock.accept()
-            connection.settimeout(0.1)
-            s_mems.conns.append(ServerConnectionInfo(connection))
-
-            server_command_map["motd"](None, connection, s_mems)
-
-            print(f"New Connection! {addr}")
-
-        except socket.timeout:
-            pass
 
         # Check currently connected sessions
         i = 0
@@ -100,8 +109,6 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
             try:  # Check if any data has been passed in and print it
 
                 message_obj = message_recv(s_mems.conns[i].connection)
-
-                print(f"RECV: {message_obj}")
 
                 print(f"Message received from {i}")
 
@@ -126,6 +133,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                     channel.remove_connection(conn)
                     del s_mems.conn_channel_map[conn]
 
+                # TODO This might not work for removing nicks for /invite
                 if message_obj is not None:
                     if message_obj.nickname in s_mems.nick_conn_map:
                         del s_mems.nick_conn_map[message_obj.nickname]
@@ -218,7 +226,6 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                             ))
                         )
 
-                        print(f"SENT: {response}")
                         message_send(response, conn)
 
                     elif msg.startswith(UNLINK_FLAG):
@@ -273,7 +280,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                     if message_obj.channel_id in s_mems.channels:
                         channel = s_mems.channels[message_obj.channel_id]
                         message_obj.set_message_type(0b00)
-                        channel.broadcast_message(message_obj)
+                        channel.broadcast_message(message_obj, is_relay=True)
                     else:
                         print(
                             "WARNING: Attempt to relay to a channel that "
@@ -284,6 +291,8 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
 
         # Sleep until the next server tick
         time.sleep(max((1 / tickrate) - (time.time() - prev), 0))
+
+    accept_connections_thread.join()
 
 
 if __name__ == "__main__":

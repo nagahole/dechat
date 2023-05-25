@@ -1,6 +1,0 @@
-TESTCASE [test_hello_world]
-Connecting to server...
-[12:24:39]                               *| Eat your vegetables!
-[12:24:39]                               *| anon joined the channel!
-[12:24:40]                            anon| Hello world!
-END OF TESTCASE

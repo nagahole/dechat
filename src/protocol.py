@@ -27,7 +27,10 @@ def message_send(message_obj: Message, connection: socket.socket) -> bytes:
     """
     encoding = message_obj.to_bytes()
 
-    connection.sendall(encoding)
+    try:
+        connection.sendall(encoding)
+    except BrokenPipeError:
+        pass
 
     return encoding
 
@@ -85,7 +88,7 @@ def bind_socket_setup(hostname: str, port: int,
     return False, None
 
 
-def conn_socket_setup(hostname: str, port: int, timeout=0.1):
+def conn_socket_setup(hostname: str, port: int, timeout=0.01):
     """
     Connects to a socket
     :: hostname : str :: hostname to connect to
@@ -95,7 +98,7 @@ def conn_socket_setup(hostname: str, port: int, timeout=0.1):
     """
     log(f"Setting up socket at {hostname}:{port}")
     connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    connection.settimeout(timeout)
+    connection.settimeout(1)
     successful = False
     try:
         log(f"Connecting to {hostname}:{port}")
@@ -107,6 +110,8 @@ def conn_socket_setup(hostname: str, port: int, timeout=0.1):
         connection = None
     except OSError as err:
         log(str(err))
+
+    connection.settimeout(timeout)
 
     if successful:
         log("Successfully set up socket")

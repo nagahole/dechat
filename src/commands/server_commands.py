@@ -260,7 +260,7 @@ def c_invite(obj: Message, conn: socket.socket,
 
     Will simply echo to the invitee "You've been invited to <channel_name>"
 
-    #TODO Maybe take channel names instead of server names?
+    # TODO Maybe take channel names instead of server names?
     """
 
     splits = utilities.smart_split(obj.message)

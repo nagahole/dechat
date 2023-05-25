@@ -104,12 +104,12 @@ def cs_reply(user_input: str, client) -> None:
         client.log("Usage: /reply <message>")
         return
 
-    if not wrapper.states.last_whisperer:
+    if not wrapper.last_whisperer:
         client.log("No one messaged you recently!")
         return
 
     msg = user_input.split(' ', 1)[1].strip()
-    echo = f"/msg {wrapper.states.last_whisperer} {msg}"
+    echo = f"/msg {wrapper.last_whisperer} {msg}"
 
     wrapper.input_queue.append(echo)
 
@@ -170,7 +170,7 @@ def cs_connect(user_input: str, client) -> None:
 
     successful, connection = conn_socket_setup(hostname, port)
 
-    if successful and client.ui_enabled:
+    if successful and client.ui_enabled and not client.testing_mode:
         ansi.clear_terminal()
 
     client.log("Connecting to server...")

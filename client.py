@@ -143,7 +143,7 @@ class Client:
             self.log("Already on that server!")
             return
 
-        if clear_terminal and self.ui_enabled:
+        if clear_terminal and self.ui_enabled and not self.testing_mode:
             ansi.clear_terminal()
 
         self.current_wrapper = wrapper
@@ -226,12 +226,18 @@ class Client:
             # Purpose of this is to join all sender and listener threads from
             # the main thread. All wrappers should be closed from here to
             # avoid threads trying to join with themselves
-            while not self._quitted:
+            while not self._quitted or len(self.wrappers_to_close) > 0:
+
+                closed_wrappers = False
 
                 for wrapper in self.wrappers_to_close:
+                    closed_wrappers = True
                     if wrapper == self.current_wrapper:
                         self.current_wrapper = None
                     wrapper.close()
+
+                if closed_wrappers:
+                    self.clear_closed_wrappers()
 
                 self.wrappers_to_close.clear()
 
@@ -266,7 +272,7 @@ class Client:
             if self._quitted:
                 return
 
-            if self.ui_enabled:
+            if self.ui_enabled and not self.testing_mode:
                 ansi.clear_line()
 
             self.handle_input(user_input)
@@ -414,14 +420,24 @@ class Client:
             command = splits[0][1:].lower()
 
             # Required for scraping channel name
-            if command in ("join", "create") and len(splits) >= 2:
+            if (command in ("join", "create") and
+                len(splits) >= 2 and
+                not wrapper.states.in_channel):
+
                 wrapper.pending_channel_name = splits[1]
+
+            # Needed to scrape last whisperer
+            elif (command == "msg" and
+                  len(splits) >= 3 and
+                  wrapper.states.in_channel):
+
+                wrapper.states.just_messaged = True
 
         if not wrapper.is_closed():
             message_send(message, wrapper.connection)
 
     def listener(self, wrapper: ClientConnectionWrapper,
-                 tickrate: float = 0.5) -> None:
+                 tickrate: float = 32) -> None:
         """
         This function will listen and print in parallel with the main program.
         Use the wrapper variable to share state where needed.
@@ -452,7 +468,7 @@ class Client:
         or not
         """
 
-        if self.ui_enabled:
+        if self.ui_enabled and not self.testing_mode:
             self.log("\r" + string, end="")
             sys.stdout.flush()
             if print_prompt and self.printed_prompt:
@@ -468,7 +484,6 @@ class Client:
         """
         Prints received messages accordingly
         """
-
         store_message = real_message
 
         msg = message.message
@@ -482,8 +497,11 @@ class Client:
                 wrapper.pending_channel_name = None
                 wrapper.states.in_channel = True
 
-            if WHISPER_SEP in message.nickname:  # Is a whisper
-                wrapper.states.last_whisperer = (
+            if (WHISPER_SEP in message.nickname and
+                not wrapper.states.just_messaged):
+                # Is a whisper to SOMEONE ELSE
+
+                wrapper.last_whisperer = (
                     message.nickname.split(WHISPER_SEP)[0].strip()
                 )
 
@@ -540,6 +558,8 @@ class Client:
 
                 self.migration_threads.append(thread)
                 thread.start()
+
+        wrapper.states.just_messaged = False
 
         if store_message:
             wrapper.store_message(message)
