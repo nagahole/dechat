@@ -113,7 +113,8 @@ def conn_socket_setup(hostname: str, port: int, timeout=0.01):
     except OSError as err:
         log(str(err))
 
-    connection.settimeout(timeout)
+    if successful:
+        connection.settimeout(timeout)
 
     if successful:
         log("Successfully set up socket")

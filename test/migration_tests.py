@@ -8,6 +8,7 @@ import unittest
 from rick_utils import (
     execute_await,
     await_response,
+    set_output_file,
     DechatTestcase,
     SERVERS
 )
@@ -198,4 +199,5 @@ class MigrationTest(DechatTestcase):
 
 
 if __name__ == "__main__":
+    set_output_file("test/logs/migration_logs.txt")
     unittest.main() # run all tests

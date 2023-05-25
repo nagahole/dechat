@@ -1,7 +1,5 @@
 # Really only need to change this line for test cases
 
-TESTCASES = migration_tests
-
 # INTENDED FOR MACOS - WILL OPEN SERVER / CLIENT IN TERMINAL
 # ONLY IF RUN ON MACOS
 
@@ -9,10 +7,6 @@ PYTHON = python3
 
 SERVER_FLAGS = --auto-retry
 CLIENT_FLAGS = --ui
-
-TEST_CASE_DIR = test
-
-TESTCASE_FILES = ${patsubst %, ${TEST_CASE_DIR}/%.py, ${TESTCASES}}
 
 server: server.py
 	$(eval DIR := $(shell pwd))
@@ -39,6 +33,15 @@ push:
 	@git push https://github.com/nagahole/dechat
 
 run_tests:
-	@for test in ${TESTCASE_FILES} ; do \
-		$(PYTHON) $$test ; \
-	done
+	@make test_base
+	@make test_multicon
+	@make test_migration
+
+test_base:
+	@$(PYTHON) test/base_tests.py
+
+test_multicon:
+	@$(PYTHON) test/multicon_tests.py
+
+test_migration:
+	@$(PYTHON) test/migration_tests.py

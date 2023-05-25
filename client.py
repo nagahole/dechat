@@ -264,7 +264,10 @@ class Client:
         """
         while not self._quitted:
             self.printed_prompt = True
-            user_input = input(INPUT_PROMPT)
+            try:
+                user_input = input(INPUT_PROMPT)
+            except EOFError:  # For handling EOF error in testcases
+                continue
             self.printed_prompt = False
 
             # Just in case the client closes while waiting for input

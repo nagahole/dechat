@@ -7,6 +7,7 @@ Testcases for dechat
 import unittest
 from rick_utils import (
     execute_await,
+    set_output_file,
     DechatTestcase,
     SERVERS
 )
@@ -117,4 +118,5 @@ class MulticonTest(DechatTestcase):
 
 
 if __name__ == "__main__":
+    set_output_file("test/logs/multicon_logs.txt")
     unittest.main() # run all tests

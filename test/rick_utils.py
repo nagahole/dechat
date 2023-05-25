@@ -3,13 +3,14 @@ Event system for tests
 """
 
 # pylint: disable=wrong-import-position, protected-access, import-error,
-# pylint: disable=wrong-import-order
+# pylint: disable=wrong-import-order, global-statement
 
 import time
 import threading
 import sys
 import unittest
 from test_utils import start_server
+import os
 
 from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
@@ -29,6 +30,13 @@ SERVERS: list[tuple[str, int]] = [
 server_instances = []
 
 DO_LOG = False
+
+def set_output_file(file_path: str) -> None:
+    """
+    Redirects output file path
+    """
+    global OUTPUT_FILE
+    OUTPUT_FILE = file_path
 
 def log(*args, **kwargs) -> None:
     """
@@ -108,6 +116,8 @@ class DechatTestcase(unittest.TestCase):
 
     @staticmethod
     def setUpClass() -> None:
+        os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+
         # Clears log file
         open(OUTPUT_FILE, "w", encoding="ascii").close()
         print("Starting servers")
