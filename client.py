@@ -47,17 +47,18 @@ class Client:
     """
     Client class
     """
-    def __init__(self, ui_enabled: bool = False,
+    def __init__(self, ui_enabled: bool = False, testing_mode: bool = False,
                  log: callable = print) -> None:
         """
         Purpose of the 'log' parameter is so I can use it as a hook
         to redirect output to be read instead of printed for testing
         """
 
-        self.quitted = False
+        self._quitted = False
         self.default_nickname = "anon"
         self.ui_enabled = ui_enabled
 
+        self.testing_mode = testing_mode
         self.log = log
 
         self.con_wrappers = {}
@@ -217,13 +218,15 @@ class Client:
         """
 
         def main_client_thread() -> None:
-            input_thread = threading.Thread(target=self.input_loop)
-            input_thread.start()
+
+            if not self.testing_mode:
+                input_thread = threading.Thread(target=self.input_loop)
+                input_thread.start()
 
             # Purpose of this is to join all sender and listener threads from
             # the main thread. All wrappers should be closed from here to
             # avoid threads trying to join with themselves
-            while not self.quitted:
+            while not self._quitted:
 
                 for wrapper in self.wrappers_to_close:
                     if wrapper == self.current_wrapper:
@@ -232,7 +235,8 @@ class Client:
 
                 self.wrappers_to_close.clear()
 
-            input_thread.join()
+            if not self.testing_mode:
+                input_thread.join()
 
             for thread in self.migration_threads:
                 thread.join()
@@ -246,20 +250,20 @@ class Client:
         Stops the client. Will take one final input if quit runs while
         sender is taking input
         """
-        self.quitted = True
+        self._quitted = True
 
     def input_loop(self) -> None:
         """
         Continuously takes user input while client has not quit
         """
-        while not self.quitted:
+        while not self._quitted:
             self.printed_prompt = True
             user_input = input(INPUT_PROMPT)
             self.printed_prompt = False
 
             # Just in case the client closes while waiting for input
             # not likely but just in case
-            if self.quitted:
+            if self._quitted:
                 return
 
             if self.ui_enabled:
@@ -426,7 +430,6 @@ class Client:
         while wrapper.states.listening and not wrapper.is_closed():
             try:
                 # While message_obj isn't None
-
                 while ((message_obj := message_recv(wrapper.connection)) and
                        wrapper.states.listening and not wrapper.is_closed()):
 

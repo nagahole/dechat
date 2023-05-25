@@ -281,6 +281,11 @@ def c_invite(obj: Message, conn: socket.socket,
         return
 
     target_conn = s_mems.nick_conn_map[target_nick]
+
+    if target_conn in s_mems.conn_channel_map:
+        echo_conn(conn, f"Unclear who {target_nick} is")
+        return
+
     channel = s_mems.channels[channel_name]
 
     echo_conn(target_conn, f"You've been invited to {channel.name}")

@@ -2,65 +2,47 @@
 Testcases for dechat
 """
 
+# pylint: disable=import-error, wrong-import-order, wrong-import-position
+
 import unittest
+from rick_utils import execute_await, DechatTestcase, SERVERS
+
 import sys
-sys.path.append("..")
-from .. import client
-from testing.rick_utils import execute_await, ClientWrapper
-from testing.test_utils import start_server
+from os import path
+sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 
-servers = [
-    ("localhost", 9996),
-    ("localhost", 9997),
-    ("localhost", 9998),
-    ("localhost", 9999)
-]
 
-class BaseDechatTest(unittest.TestCase):
+class BaseDechatTest(DechatTestcase):
     """
     Base dechat test cases - no optional components
     """
-    def setUp(self):
-        """
-        Setup
-        """
-        print("Starting up client")
-        self.client = ClientWrapper(client.Client(ui_enabled=False))
-
-    def tearDown(self):
-        """
-        Destructor
-        """
-        print("Closing client")
-        # Just to make sure absolutely has quit from channel to server to
-        # bare client to exit
-        for _ in range(3):
-            self.client.feed_input("/quit")
 
     def test_hello_world(self):
         """
         Simple hello world test
         """
-        print("Test hello world")
 
         execute_await(
-            f"/connect {servers[0][0]}:{servers[0][1]}",
+            f"/connect {SERVERS[0][0]}:{SERVERS[0][1]}",
             self.client,
-            throw_error=False
         )
 
-        execute_await(
-            "/create hello_world", self.client, throw_error=False
-        )
+        response = execute_await("/create hello_world", self.client)
 
-        response = execute_await(
-            "Hello world!", self.client, throw_error=False
-        )
+        if "already exists" in "".join(response):
+            execute_await("/join hello_world", self.client)
 
-        print(response)
+        execute_await("Hello world!", self.client)
+
+    def test_msg(self):
+        """
+        Messaging between two clients
+        """
+        client = DechatTestcase.create_client()
+
+        execute_await("/nick client_1", self.client)
+        execute_await("/nick client_2", client)
 
 
 if __name__ == "__main__":
-    for server in servers:
-        start_server(server[0], server[1])
     unittest.main() # run all tests

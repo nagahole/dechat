@@ -2,6 +2,7 @@
 # ONLY IF RUN ON MACOS
 
 SERVER_FLAGS = --auto-retry
+CLIENT_FLAGS = --ui
 
 all: s
 
@@ -38,11 +39,11 @@ s: server.py
 	@python3 $^
 
 c: client.py
-	@python3 $^ --ui
+	@python3 $^ $(CLIENT_FLAGS)
 
 push:
 	@git push git.edstem.org:challenge/85943/assignment-2-dechat
 	@git push https://github.com/nagahole/dechat
 
 run_tests:
-	python3 testing/base_tests.py
+	@python3 testing/base_tests.py

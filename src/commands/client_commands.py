@@ -19,13 +19,6 @@ from src.constants import MAX_NICK_LENGTH
 # - m: mutual
 
 
-def c_c(_user_input: str, client) -> None:
-    """
-    TODO Remove this - Just for convenience
-    """
-    c_connect("/connect localhost:9996", client)
-
-
 def c_connect(user_input: str, client) -> None:
     """
     CLIENT COMMAND
@@ -265,7 +258,6 @@ def m_display(user_input: str, client) -> None:
 
 
 client_command_map = {
-    "c": c_c,
     "connect": c_connect,
     "quit": c_quit,
     "nick": c_nick,
@@ -273,7 +265,6 @@ client_command_map = {
 
 
 multicon_client_command_map = {
-    "c": c_c,
     "connect": c_connect,
     "quit": c_quit,
     "nick": c_nick,

@@ -8,8 +8,8 @@ from functools import partial
 # This should be the relative path from whever this script is launched to DECHAT
 
 DECHAT_DIRECTORY = "."
-SERVER_START_CMD = ["python3", "-u", "server.py"]
-CLIENT_START_CMD = ["python3", "-u", "client.py"]
+SERVER_START_CMD = ["python3", "server.py"]
+CLIENT_START_CMD = ["python3", "client.py"]
 
 # Replacing POPEN so that we don"t need to worry about fds and cwd
 Popen = partial(Popen, cwd=DECHAT_DIRECTORY, stdin=PIPE, stdout=PIPE)
