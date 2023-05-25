@@ -247,7 +247,13 @@ class BaseDechatTest(DechatTestcase):
 
         execute_await("/create password smart_people_only", creator)
         execute_await("/join password smart_people_only", smart)
+
+        smart.clear_buffer()
         execute_await("/join password bruh", dumb)
+
+        response = await_response(smart, timeout=1)
+
+        assert response is None
 
         execute_await("Hi fellow smart guy", creator)
         execute_await("Why hello fellow smart guy", smart)
@@ -275,7 +281,9 @@ class BaseDechatTest(DechatTestcase):
         execute_await("You shouldn't see this", creator)
         execute_sequence_await(["You should see this 5 times"] * 5, creator)
 
-        execute_await("/join message_limit", ignorant, period=1)
+        response = execute_await("/join message_limit", ignorant, period=1)
+
+        assert "You shouldn't see this" not in "".join(response)
 
         DechatTestcase.write_client_lines(creator, ignorant)
 
@@ -300,7 +308,13 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/join change_pass old_pass", lucky)
         creator.feed_input("/pass new_pass")
         time.sleep(0.05)
+
+        creator.clear_buffer()
         execute_await("/join change_pass old_pass", unlucky)
+        response = await_response(creator, timeout=1)
+
+        assert response is None
+
         execute_await("/quit", unlucky)
 
         execute_await(
@@ -330,7 +344,9 @@ class BaseDechatTest(DechatTestcase):
 
         execute_await("/join owner_pass", creator)
 
-        execute_await("I am in!", creator)
+        response = execute_await("I am in!", creator)
+
+        assert "I am in!" in response[-1]
 
         DechatTestcase.write_client_lines(creator, observer)
 
@@ -437,7 +453,7 @@ class BaseDechatTest(DechatTestcase):
         invitee.clear_buffer()
         inviter.feed_input("/invite invitee invite_2")
 
-        response = await_response(invitee)
+        response = await_response(invitee, timeout=1)
 
         assert response is None
 

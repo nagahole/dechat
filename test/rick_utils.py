@@ -16,8 +16,8 @@ from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from client import Client
 
-DEFAULT_PERIOD = 0.08
-DEFAULT_TIMEOUT = 5
+DEFAULT_PERIOD = 0.2
+DEFAULT_TIMEOUT = 3
 OUTPUT_FILE = "test/test_logs.txt"
 
 SERVERS: list[tuple[str, int]] = [

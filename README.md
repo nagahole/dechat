@@ -99,6 +99,8 @@ Each test case will print the executed inputs into the client as it runs them to
 
 I have added assertions for the most important parts of the test cases, meaning that if there are no raised exceptions at the end of each suite of test cases, then all of them have passed.
 
-Otherwise, if there are raised exceptions when a suite has finished running, it means there are errors
+Otherwise, if there are raised exceptions when a suite has finished running, it means there are errors.
+
+However for some test-cases I have not added assertions, so they have to be checked manually through the log files
 
 I also output the client prints of each test case for each suite in log files in test/logs for more detailed debugging and testing

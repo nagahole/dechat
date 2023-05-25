@@ -51,7 +51,9 @@ class MigrationTest(DechatTestcase):
 
         execute_await("Hello world!", client_1)
 
-        await_response(client_2)
+        response = await_response(client_2)
+
+        assert "Hello world!" in response[-1]
 
         execute_await("/quit", client_2)
         execute_await(
@@ -102,8 +104,10 @@ class MigrationTest(DechatTestcase):
 
         execute_await("Three way link!", client_1)
 
-        await_response(client_2)
-        await_response(client_3)
+        response = await_response(client_2)
+        assert "Three way link!" in response[-1]
+        response = await_response(client_3)
+        assert "Three way link!" in response[-1]
 
         execute_await("/quit bye client 2 and client 3", client_1)
 
@@ -194,6 +198,8 @@ class MigrationTest(DechatTestcase):
             client_1,
             period=1
         )
+
+        # Not crashing is a pass
 
         DechatTestcase.write_client_lines(client_1, client_2)
 
