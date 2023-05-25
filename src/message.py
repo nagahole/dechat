@@ -2,6 +2,9 @@
 Wrapper class for the message protocol. Intended to make life easier
 """
 
+# False-positive import error
+# pylint: disable=import-error
+
 from src import utilities
 from src.constants import NICK_MSG_SEPARATOR, MAX_NICK_LENGTH
 

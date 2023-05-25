@@ -2,6 +2,8 @@
 Common information containers to be used between files
 """
 
+# False-positive import error
+# pylint: disable=import-error
 
 import socket
 import time

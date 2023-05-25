@@ -3,6 +3,9 @@ Implementation of all server commands and stores a map associating each
 command to their functions
 """
 
+# False-positive import error
+# pylint: disable=import-error
+
 import os
 import socket
 import time

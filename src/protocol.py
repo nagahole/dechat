@@ -3,9 +3,11 @@
     A few wrappers for network functions for the dechat client and server
 """
 
+# False-positive import error
+# pylint: disable=import-error
+
 import socket
 from src.message import Message
-# YOU WILL NEED TO MODIFY THESE FUNCTIONS TO SUIT THE HEADER FORMAT IN THE SPEC
 
 
 DO_LOG = False

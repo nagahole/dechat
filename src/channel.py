@@ -3,6 +3,9 @@ Channels are a component of servers that contains members and can broadcast
 to every member messages as well as having its own commands
 """
 
+# False-positive import error
+# pylint: disable=import-error
+
 import threading
 import socket
 import time

@@ -2,6 +2,9 @@
 Useful utility functions that may be used across multiple files
 """
 
+# False-positive import error
+# pylint: disable=import-error
+
 import time
 from src.constants import MAX_PORT_VALUE
 

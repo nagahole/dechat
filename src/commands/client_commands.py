@@ -4,6 +4,9 @@ command to their functions. Has multiple maps for the multiple possible
 different "stages" of client commands
 """
 
+# False-positive import error
+# pylint: disable=import-error
+
 from src import ansi
 from src import utilities
 from src.commons import (
