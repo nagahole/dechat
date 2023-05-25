@@ -340,7 +340,6 @@ class BaseDechatTest(DechatTestcase):
 
         DechatTestcase.write_client_lines(client)
 
-
     def test_invite(self) -> None:
         """
         Tests the /invite server function
@@ -362,6 +361,31 @@ class BaseDechatTest(DechatTestcase):
         invitee.clear_buffer()
         inviter.feed_input("/invite invitee invite")
         await_response(invitee)
+
+        DechatTestcase.write_client_lines(inviter, invitee)
+
+    def test_invite_2(self) -> None:
+        """
+        An edge case for my implementation of /invite
+        """
+        inviter = DechatTestcase.create_client()
+        invitee = DechatTestcase.create_client()
+
+        execute_await("/nick inviter", inviter)
+        execute_await("/nick invitee", invitee)
+
+        DechatTestcase.connect(inviter, SERVERS[0])
+        DechatTestcase.connect(invitee, SERVERS[0])
+
+        # Needed so that server can extract nickname from this message
+        invitee.feed_input("INPUT")
+        time.sleep(0.3)
+        execute_await("/quit", invitee)
+
+        execute_await("/create invite_2", inviter)
+        execute_await("/quit", inviter)
+        invitee.clear_buffer()
+        inviter.feed_input("/invite invitee invite_2")
 
         DechatTestcase.write_client_lines(inviter, invitee)
 

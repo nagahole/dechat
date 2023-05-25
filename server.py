@@ -133,10 +133,13 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                     channel.remove_connection(conn)
                     del s_mems.conn_channel_map[conn]
 
-                # TODO This might not work for removing nicks for /invite
-                if message_obj is not None:
-                    if message_obj.nickname in s_mems.nick_conn_map:
-                        del s_mems.nick_conn_map[message_obj.nickname]
+                if conn in s_mems.conn_nick_map:
+                    nick = s_mems.conn_nick_map[conn]
+
+                    if nick in s_mems.nick_conn_map:
+                        del s_mems.nick_conn_map[nick]
+
+                    del s_mems.conn_nick_map[conn]
 
                 conn.close()
                 i -= 1
@@ -152,6 +155,7 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                 if message_obj.message_type not in (0b11, 0b10):
 
                     s_mems.nick_conn_map[message_obj.nickname] = conn
+                    s_mems.conn_nick_map[conn] = message_obj.nickname
 
                     is_command = msg and msg[0] == "/"
 
@@ -241,11 +245,16 @@ def run_server(hostname="localhost", port=9996, tickrate=1):
                         if channel_name in s_mems.channels:
                             channel = s_mems.channels[channel_name]
 
-                            channel.unlink_channel(
+                            if channel.linked_to_channel(
                                 channel_name,
                                 hostname=splits[2],
                                 port=int(splits[3])
-                            )
+                            ):
+                                channel.unlink_channel(
+                                    channel_name,
+                                    hostname=splits[2],
+                                    port=int(splits[3])
+                                )
 
                     elif msg.startswith(LINK_RESPONSE_FLAG):
                         # Standard is:

@@ -29,6 +29,7 @@ class ServerMembers:
         self.conn_channel_map = {}
 
         self.nick_conn_map = {}
+        self.conn_nick_map = {}
 
         self.quitted = False
 

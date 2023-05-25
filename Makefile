@@ -1,3 +1,7 @@
+# Really only need to change this line for test cases
+
+TESTCASES = migration_tests
+
 # INTENDED FOR MACOS - WILL OPEN SERVER / CLIENT IN TERMINAL
 # ONLY IF RUN ON MACOS
 
@@ -7,7 +11,6 @@ SERVER_FLAGS = --auto-retry
 CLIENT_FLAGS = --ui
 
 TEST_CASE_DIR = test
-TESTCASES = base_tests
 
 TESTCASE_FILES = ${patsubst %, ${TEST_CASE_DIR}/%.py, ${TESTCASES}}
 
