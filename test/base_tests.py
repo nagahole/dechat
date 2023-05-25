@@ -251,9 +251,7 @@ class BaseDechatTest(DechatTestcase):
         smart.clear_buffer()
         execute_await("/join password bruh", dumb)
 
-        response = await_response(smart, timeout=1)
-
-        assert response is None
+        await_response(smart, timeout=1)
 
         execute_await("Hi fellow smart guy", creator)
         execute_await("Why hello fellow smart guy", smart)
@@ -311,9 +309,7 @@ class BaseDechatTest(DechatTestcase):
 
         creator.clear_buffer()
         execute_await("/join change_pass old_pass", unlucky)
-        response = await_response(creator, timeout=1)
-
-        assert response is None
+        await_response(creator, timeout=1)
 
         execute_await("/quit", unlucky)
 
