@@ -273,11 +273,11 @@ def c_invite(obj: Message, conn: socket.socket,
     channel_name = splits[2]
 
     if target_nick not in s_mems.nick_conn_map:
-        echo_conn(conn, f"{target_nick} doesn't exist")
+        echo_conn(conn, f"User {target_nick} doesn't exist")
         return
 
     if channel_name not in s_mems.channels:
-        echo_conn(conn, f"{channel_name} doesn't exist")
+        echo_conn(conn, f"Channel {channel_name} doesn't exist")
         return
 
     target_conn = s_mems.nick_conn_map[target_nick]

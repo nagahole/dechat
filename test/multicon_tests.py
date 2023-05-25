@@ -104,5 +104,17 @@ class MulticonTest(DechatTestcase):
 
         DechatTestcase.write_client_lines(client)
 
+    def test_decimal_display_num(self) -> None:
+        """
+        See how the client parses decimal place display numbers
+        """
+        client = DechatTestcase.create_client(ui_enabled=True)
+
+        execute_await(f"/connect {SERVERS[0][0]}:{SERVERS[0][1]} 0.5", client)
+        execute_await("/list_displays", client)
+
+        DechatTestcase.write_client_lines(client)
+
+
 if __name__ == "__main__":
     unittest.main() # run all tests

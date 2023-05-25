@@ -9,6 +9,7 @@ import time
 from rick_utils import (
     execute_await,
     execute_sequence_await,
+    await_response,
     DechatTestcase,
     SERVERS
 )
@@ -338,6 +339,31 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/help", client)
 
         DechatTestcase.write_client_lines(client)
+
+
+    def test_invite(self) -> None:
+        """
+        Tests the /invite server function
+        """
+        inviter = DechatTestcase.create_client()
+        invitee = DechatTestcase.create_client()
+
+        execute_await("/nick inviter", inviter)
+        execute_await("/nick invitee", invitee)
+
+        DechatTestcase.connect(inviter, SERVERS[0])
+        DechatTestcase.connect(invitee, SERVERS[0])
+
+        # Needed so that server can extract nickname from this message
+        invitee.feed_input("INPUT")
+
+        execute_await("/create invite", inviter)
+        execute_await("/quit", inviter)
+        invitee.clear_buffer()
+        inviter.feed_input("/invite invitee invite")
+        await_response(invitee)
+
+        DechatTestcase.write_client_lines(inviter, invitee)
 
 
 if __name__ == "__main__":

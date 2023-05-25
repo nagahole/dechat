@@ -7,19 +7,9 @@ SERVER_FLAGS = --auto-retry
 CLIENT_FLAGS = --ui
 
 TEST_CASE_DIR = test
-TESTCASES = multicon_tests
+TESTCASES = base_tests
 
 TESTCASE_FILES = ${patsubst %, ${TEST_CASE_DIR}/%.py, ${TESTCASES}}
-
-all: s
-
-client: client.py
-	$(eval DIR := $(shell pwd))
-	@osascript \
-	-e 'tell app "Terminal"' \
-		-e 'do script "cd $(DIR) && $(PYTHON) $^ "' \
-		-e 'activate' \
-	-e 'end tell'
 
 server: server.py
 	$(eval DIR := $(shell pwd))
@@ -35,15 +25,8 @@ server: server.py
 		-e 'activate' \
 	-e 'end tell'
 
-both:
-	$(eval DIR := $(shell pwd))
-	@osascript \
-	-e 'tell app "Terminal"' \
-		-e 'do script "cd $(DIR) && make server && make client && exit"' \
-	-e 'end tell'
-
 s: server.py
-	@$(PYTHON) $^
+	@$(PYTHON) $^ $(SERVER_FLAGS)
 
 c: client.py
 	@$(PYTHON) $^ $(CLIENT_FLAGS)
