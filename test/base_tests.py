@@ -35,7 +35,9 @@ class BaseDechatTest(DechatTestcase):
         DechatTestcase.connect(client, SERVERS[0])
 
         execute_await("/create hello_world", client)
-        execute_await("Hello world!", client)
+        response = execute_await("Hello world!", client)
+
+        assert "Hello world!" in response[-1]
 
         DechatTestcase.write_client_lines(client)
 
@@ -55,7 +57,20 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/create msg", client_1)
         execute_await("/join msg", client_2)
 
-        execute_await("/msg client_2 This is a message!", client_1)
+        client_2.clear_buffer()
+        response = execute_await("/msg client_2 This is a message!", client_1)
+
+        assert (
+            "This is a message" in response[-1] and
+            "client_1->client_2" in response[-1]
+        )
+
+        response = await_response(client_2)
+
+        assert (
+            "This is a message" in response[-1] and
+            "client_1->client_2" in response[-1]
+        )
 
         DechatTestcase.write_client_lines(client_1, client_2)
 
@@ -77,8 +92,18 @@ class BaseDechatTest(DechatTestcase):
 
         execute_await("/msg client_2 This is a message!", client_1)
         execute_await("/reply This should not work", client_1)
+
+        client_1.clear_buffer()
+
         execute_await("/reply Hi client 1", client_2)
         execute_await("/reply Hi client 1 again", client_2)
+
+        response = await_response(client_1)
+
+        assert (
+            "Hi client 1" in response[-2] and
+            "Hi client 1 again" in response[-1]
+        )
 
         DechatTestcase.write_client_lines(client_1, client_2)
 
@@ -98,6 +123,8 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/create emote", emoter)
         execute_await("/join emote", observer)
 
+        observer.clear_buffer()
+
         execute_sequence_await(
             [
                 "/emote is cool!",
@@ -107,6 +134,12 @@ class BaseDechatTest(DechatTestcase):
                 "/emote emote 3"
             ],
             emoter
+        )
+
+        response = await_response(observer, period=1)
+
+        assert(
+            "emoter emote 3" in response[-1]
         )
 
         DechatTestcase.write_client_lines(emoter, observer)
@@ -127,10 +160,13 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/create admin", admin)
         execute_await("/join admin", regular)
 
-        execute_await("/admin admin", admin)
-        execute_await("/admin admin", regular)
-        execute_await("/admin regular", admin)
-        execute_await("/admin regular", regular)
+        response = execute_await("/admin admin", admin)
+
+        assert "admin is an operator" in response[-1]
+
+        response = execute_await("/admin regular", regular)
+
+        assert "regular is a regular" in response[-1]
 
         DechatTestcase.write_client_lines(admin, regular)
 
@@ -150,7 +186,11 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/create quit", quitter)
         execute_await("/join quit", observer)
 
+        observer.clear_buffer()
         execute_await("/quit I am having a bad day", quitter)
+        response = await_response(observer)
+
+        assert "(I am having a bad day)" in response[-1]
 
         DechatTestcase.write_client_lines(quitter, observer)
 
@@ -170,12 +210,21 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/create multi_nick", observer)
         execute_await("/join multi_nick", multi_nick)
 
+        observer.clear_buffer()
+
         multi_nick.feed_input("/nick nick_a")
         execute_await("/msg observer Hi", multi_nick)
         multi_nick.feed_input("/nick nick_b")
         execute_await("/msg observer Hi", multi_nick)
         multi_nick.feed_input("/nick nick_c")
         execute_await("/msg observer Hi", multi_nick)
+
+        response = await_response(observer)
+
+        assert (
+            "nick_c->observer" in response[-1] and
+            "Hi" in response[-1]
+        )
 
         DechatTestcase.write_client_lines(observer, multi_nick)
 
@@ -387,6 +436,10 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/quit", inviter)
         invitee.clear_buffer()
         inviter.feed_input("/invite invitee invite_2")
+
+        response = await_response(invitee)
+
+        assert response is None
 
         DechatTestcase.write_client_lines(inviter, invitee)
 

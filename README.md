@@ -91,9 +91,7 @@ Each suite of test cases has its own makefile rule to run them
 - Multicon module: "make test_multicon"
 - Migration module: "make test_migration"
 
-And to run all three of them sequentially, simply type
-
-- "make run_tests"
+Just be sure to run the tests with a slight gap in-between them to allow the server connections to unbind
 
 ## Structure of test-cases
 

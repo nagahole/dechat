@@ -32,11 +32,6 @@ push:
 	@git push git.edstem.org:challenge/85943/assignment-2-dechat
 	@git push https://github.com/nagahole/dechat
 
-run_tests:
-	@make test_base
-	@make test_multicon
-	@make test_migration
-
 test_base:
 	@$(PYTHON) test/base_tests.py
 

@@ -347,14 +347,10 @@ class Channel:
                         echo = target_name
 
                         if not user_exists:
-
                             echo += " doesn't exist"
-
                         elif is_admin:
-
                             echo += " is an operator"
                         else:
-
                             echo += " is a regular"
 
                         self.echo_conn(connection, echo)
@@ -404,7 +400,7 @@ class Channel:
 
                         sender_name = self.connection_nickname_map[connection]
 
-                        nick_field = f"{sender_name} -> {target_name}"
+                        nick_field = f"{sender_name}->{target_name}"
 
                         message_obj = Message(self.id, nick_field,
                                               time.time(), 0b00, message)
