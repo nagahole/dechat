@@ -64,10 +64,7 @@ class AliasDictionary:
 
     def __iter__(self):
         """
-        Need to modify this dunder method so that when you run
-        "alias in AliasDictionary" it will return true, because
-        without this code when you call in on an AliasDictionary
-        it will only iterate through the keys, not the aliases
+        Iterates through all keys and aliases in the dictionary
         """
 
         # Not the cleanest solution because iterating through builtin
