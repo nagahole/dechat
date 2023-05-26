@@ -24,6 +24,18 @@ Otherwise, if there are raised exceptions when a suite has finished running, it 
 
 I also output the client prints of each test case for each suite in log files in test/logs for more detailed debugging and testing
 
+## Encoding
+
+If there are any encoding issues they can be resolved in the message.py file as that serves as a wrapper that abstracts all the encoding and decoding for the whole project.
+
+If there do happen to be any encoding issues, it is likely the result of the message type bits and message length bits.
+
+As I have it now, I merge the message type and length bits using bitmasking and then encode them together.
+
+Because of the nature of little endianness and this merge, before encoding, the message type bits are on the right side and message length bits are on the left. It is reverse order because when encoded using little endianness, the order flips, leaving message type bits in the correct position on the left and message length bits on the right while adhering to the little endianness encoding.
+
+If I do happen to interpret the encoding wrong, simply change the .from_bytes, .to_bytes, .encode_type_and_length and .decode_type_and_length methods in the message.py file.
+
 ## Implementation
 
 My code is split into many files. However, the main files to consider are
