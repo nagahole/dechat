@@ -4,7 +4,6 @@ Testcases for dechat
 
 # pylint: disable=import-error, wrong-import-order, wrong-import-position
 
-import time
 import unittest
 from rick_utils import (
     execute_await,
