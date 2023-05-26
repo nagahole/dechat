@@ -4,6 +4,7 @@ Testcases for dechat
 
 # pylint: disable=import-error, wrong-import-order, wrong-import-position
 
+import time
 import unittest
 from rick_utils import (
     execute_await,
@@ -211,6 +212,72 @@ class MigrationTest(DechatTestcase):
         )
 
         # Not crashing is a pass
+
+    def test_migrate(self) -> None:
+        """
+        Tests /migrate
+        """
+
+        client_1 = DechatTestcase.create_client()
+        observer = DechatTestcase.create_client()
+        client_2 = DechatTestcase.create_client()
+
+        self.clients = [client_1, observer, client_2]
+
+        execute_await(f"/nick client_{SERVERS[0][1]}", client_1)
+        execute_await("/nick observer", observer)
+        execute_await(f"/nick client_{SERVERS[1][1]}", client_2)
+
+        DechatTestcase.connect(client_1, SERVERS[0])
+        DechatTestcase.connect(observer, SERVERS[0])
+        DechatTestcase.connect(client_2, SERVERS[1])
+
+        execute_await("/create migration", client_1)
+        execute_await("/join migration", observer)
+        execute_await("/create migration", client_2)
+
+        execute_await("/quit", client_1)
+        execute_await(
+            f"/link migration {SERVERS[1][0]}:{SERVERS[1][1]}",
+            client_1,
+            period=1
+        )
+
+        execute_await("/join migration", client_1)
+        client_2.clear_buffer()
+
+        execute_await("Hello world!", client_1)
+
+        response = await_response(client_2)
+
+        assert "Hello world!" in response[-1]
+
+        DechatTestcase.connect(client_1, SERVERS[1])
+
+        observer.clear_buffer()
+        execute_await(
+            f"/migrate migration {SERVERS[0][0]}:{SERVERS[0][1]}", client_1
+        )
+
+        response = await_response(observer)
+
+        assert (
+            f"client_{SERVERS[1][1]} joined the channel!" in "".join(response)
+        )
+
+        response = execute_await("/join migration", client_1)
+
+        assert "doesn't exist" in response[-1]
+
+        DechatTestcase.connect(client_1, SERVERS[0])
+
+        client_2.clear_buffer()
+        execute_await("/join migration", client_1)
+        execute_await("Hello world!", client_1)
+
+        response = await_response(client_2)
+
+        assert "Hello world!" in response[-1]
 
 
 if __name__ == "__main__":

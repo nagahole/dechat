@@ -4,7 +4,7 @@
 
 ### How to run test-cases
 
-I have 3 suites of test cases. One for base de-chat (no additional modules or components), one for mult-icon, and one for migration
+I have 3 suites of test cases. One for base de-chat (no additional modules or components), one for multi-con, and one for migration
 
 Each suite of test cases has its own makefile rule to run them
 

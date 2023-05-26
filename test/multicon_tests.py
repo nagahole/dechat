@@ -89,7 +89,7 @@ class MulticonTest(DechatTestcase):
         execute_await(f"/connect {SERVERS[0][0]}:{SERVERS[0][1]} -1", client)
         response = execute_await("/list_displays", client)
 
-        assert "-1:" in response[-1]
+        assert "-1 :" in response[-1]
 
     def test_list_display_channels(self) -> None:
         """
