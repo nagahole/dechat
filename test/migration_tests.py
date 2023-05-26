@@ -30,6 +30,8 @@ class MigrationTest(DechatTestcase):
         client_1 = DechatTestcase.create_client()
         client_2 = DechatTestcase.create_client()
 
+        self.clients = [client_1, client_2]
+
         execute_await(f"/nick client_{SERVERS[0][1]}", client_1)
         execute_await(f"/nick client_{SERVERS[1][1]}", client_2)
 
@@ -62,8 +64,6 @@ class MigrationTest(DechatTestcase):
             period=1
         )
 
-        DechatTestcase.write_client_lines(client_1, client_2)
-
     def test_threeway_link(self) -> None:
         """
         Prints hello world on each server
@@ -71,6 +71,8 @@ class MigrationTest(DechatTestcase):
         client_1 = DechatTestcase.create_client()
         client_2 = DechatTestcase.create_client()
         client_3 = DechatTestcase.create_client()
+
+        self.clients = [client_1, client_2, client_3]
 
         execute_await(f"/nick client_{SERVERS[0][1]}", client_1)
         execute_await(f"/nick client_{SERVERS[1][1]}", client_2)
@@ -119,10 +121,12 @@ class MigrationTest(DechatTestcase):
 
         execute_await("/join three_link", client_1)
 
-        client_3.clear_buffer()
+        client_2.clear_buffer()
         execute_await("Only client 3 should see this", client_1)
 
-        await_response(client_3)
+        response = await_response(client_2, timeout=1)
+
+        assert response is None
 
         execute_await("/quit bye client 3 only", client_1)
 
@@ -132,10 +136,15 @@ class MigrationTest(DechatTestcase):
             period=1
         )
 
+        client_2.clear_buffer()
+        client_3.clear_buffer()
         execute_await("/join three_link", client_1)
         execute_await("Only I should see this", client_1)
 
-        DechatTestcase.write_client_lines(client_1, client_2, client_3)
+        response = await_response(client_2, timeout=1)
+        assert response is None
+        response = await_response(client_3, timeout=1)
+        assert response is None
 
     def test_void_unlinks(self) -> None:
         """
@@ -144,6 +153,8 @@ class MigrationTest(DechatTestcase):
 
         client_1 = DechatTestcase.create_client()
         client_2 = DechatTestcase.create_client()
+
+        self.clients = [client_1, client_2]
 
         execute_await(f"/nick client_{SERVERS[0][1]}", client_1)
         execute_await(f"/nick client_{SERVERS[1][1]}", client_2)
@@ -200,8 +211,6 @@ class MigrationTest(DechatTestcase):
         )
 
         # Not crashing is a pass
-
-        DechatTestcase.write_client_lines(client_1, client_2)
 
 
 if __name__ == "__main__":

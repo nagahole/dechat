@@ -84,3 +84,13 @@ def split_hostname_port(string: str) -> tuple[str | None, int | None]:
         return None, None
 
     return hostname, port
+
+
+def flush_print(*args, **kwargs):
+    """
+    Flushes by default
+    """
+    if "flush" in kwargs:
+        print(*args, **kwargs)
+    else:
+        print(*args, **kwargs, flush=True)

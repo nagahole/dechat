@@ -7,7 +7,7 @@ from test_utils import start_server, start_client, client_write, client_read
 
 import time
 
-DO_LOG = True
+DO_LOG = False
 
 def log(*args, **kwargs):
     if DO_LOG:
@@ -33,7 +33,7 @@ class SimpleTestCases(unittest.TestCase):
         client_write(client, '/nick test_c_send\n')
         client_write(client, f"/connect localhost:{port}\n")
 
-        time.sleep(3)
+        time.sleep(1)
         response = client_read(client)
         log("\n".join(response))
         log()
@@ -49,8 +49,11 @@ class SimpleTestCases(unittest.TestCase):
         client_write(client, '/nick test_c_echo\n')
         client_write(client, f"/connect localhost:{port}\n")
         client_write(client, '/create info1910\n')
+        time.sleep(0.5)
         client_write(client, "Hello World!\n")
-        time.sleep(3)
+
+        time.sleep(1)
+
         response = client_read(client)
         log("\n".join(response))
         log()
@@ -74,10 +77,10 @@ class SimpleTestCases(unittest.TestCase):
         client_write(client_b, '/nick test2\n')
         client_write(client_b, f"/connect localhost:{port}\n")
         client_write(client_b, '/join info1910\n')
-
+        time.sleep(0.5)
         client_write(client_a, "Hello World!\n")
 
-        time.sleep(3)
+        time.sleep(1)
 
         response = client_read(client_a)
         log("\n".join(response))

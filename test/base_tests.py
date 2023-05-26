@@ -32,6 +32,8 @@ class BaseDechatTest(DechatTestcase):
 
         client = DechatTestcase.create_client()
 
+        self.clients = [client]
+
         DechatTestcase.connect(client, SERVERS[0])
 
         execute_await("/create hello_world", client)
@@ -39,14 +41,14 @@ class BaseDechatTest(DechatTestcase):
 
         assert "Hello world!" in response[-1]
 
-        DechatTestcase.write_client_lines(client)
-
     def test_msg(self):
         """
         Messaging between two clients
         """
         client_1 = DechatTestcase.create_client()
         client_2 = DechatTestcase.create_client()
+
+        self.clients = [client_1, client_2]
 
         execute_await("/nick client_1", client_1)
         execute_await("/nick client_2", client_2)
@@ -72,14 +74,14 @@ class BaseDechatTest(DechatTestcase):
             "client_1->client_2" in response[-1]
         )
 
-        DechatTestcase.write_client_lines(client_1, client_2)
-
     def test_reply(self):
         """
         Tests replies between two clients
         """
         client_1 = DechatTestcase.create_client()
         client_2 = DechatTestcase.create_client()
+
+        self.clients = [client_1, client_2]
 
         execute_await("/nick client_1", client_1)
         execute_await("/nick client_2", client_2)
@@ -105,14 +107,14 @@ class BaseDechatTest(DechatTestcase):
             "Hi client 1 again" in response[-1]
         )
 
-        DechatTestcase.write_client_lines(client_1, client_2)
-
     def test_emote(self):
         """
         Testing the /emote command
         """
         emoter = DechatTestcase.create_client()
         observer = DechatTestcase.create_client()
+
+        self.clients = [emoter, observer]
 
         execute_await("/nick emoter", emoter)
         execute_await("/nick observer", observer)
@@ -133,16 +135,13 @@ class BaseDechatTest(DechatTestcase):
                 "/emote emote 2",
                 "/emote emote 3"
             ],
-            emoter
+            emoter,
+            period=1.5
         )
 
         response = await_response(observer, period=1)
 
-        assert(
-            "emoter emote 3" in response[-1]
-        )
-
-        DechatTestcase.write_client_lines(emoter, observer)
+        assert "emoter emote 3" in response[-1], "Got: " + response[-1]
 
     def test_admin(self):
         """
@@ -150,6 +149,8 @@ class BaseDechatTest(DechatTestcase):
         """
         admin = DechatTestcase.create_client()
         regular = DechatTestcase.create_client()
+
+        self.clients = [admin, regular]
 
         execute_await("/nick admin", admin)
         execute_await("/nick regular", regular)
@@ -168,14 +169,14 @@ class BaseDechatTest(DechatTestcase):
 
         assert "regular is a regular" in response[-1]
 
-        DechatTestcase.write_client_lines(admin, regular)
-
     def test_quit_message(self) -> None:
         """
         Tests for correct quit messages
         """
         quitter = DechatTestcase.create_client()
         observer = DechatTestcase.create_client()
+
+        self.clients = [quitter, observer]
 
         execute_await("/nick quitter", quitter)
         execute_await("/nick observer", observer)
@@ -192,14 +193,14 @@ class BaseDechatTest(DechatTestcase):
 
         assert "(I am having a bad day)" in response[-1]
 
-        DechatTestcase.write_client_lines(quitter, observer)
-
     def test_nick_in_channel(self) -> None:
         """
         Changing nick in channel
         """
         observer = DechatTestcase.create_client()
         multi_nick = DechatTestcase.create_client()
+
+        self.clients = [observer, multi_nick]
 
         execute_await("/nick observer", observer)
         execute_await("/nick multi_nick", multi_nick)
@@ -215,18 +216,22 @@ class BaseDechatTest(DechatTestcase):
         multi_nick.feed_input("/nick nick_a")
         execute_await("/msg observer Hi", multi_nick)
         multi_nick.feed_input("/nick nick_b")
-        execute_await("/msg observer Hi", multi_nick)
+        execute_await("/msg observer Hii", multi_nick)
         multi_nick.feed_input("/nick nick_c")
-        execute_await("/msg observer Hi", multi_nick)
+        execute_await("/msg observer Hiii", multi_nick)
 
         response = await_response(observer)
 
-        assert (
-            "nick_c->observer" in response[-1] and
-            "Hi" in response[-1]
-        )
+        response = "".join(response)
 
-        DechatTestcase.write_client_lines(observer, multi_nick)
+        assert (
+            "nick_a->observer" in response and
+            "nick_b->observer" in response and
+            "nick_c->observer" in response and
+            "Hi" in response and
+            "Hii" in response and
+            "Hiii" in response
+        )
 
     def test_password_channel(self) -> None:
         """
@@ -237,6 +242,8 @@ class BaseDechatTest(DechatTestcase):
         smart = DechatTestcase.create_client()
         dumb = DechatTestcase.create_client()
 
+        self.clients = [creator, smart, dumb]
+
         execute_await("/nick creator", creator)
         execute_await("/nick smart", smart)
         execute_await("/nick dumb", dumb)
@@ -246,18 +253,17 @@ class BaseDechatTest(DechatTestcase):
         DechatTestcase.connect(dumb, SERVERS[0])
 
         execute_await("/create password smart_people_only", creator)
-        execute_await("/join password smart_people_only", smart)
+        execute_await("/join password smart_people_only", smart, timeout=1)
 
         smart.clear_buffer()
         execute_await("/join password bruh", dumb)
+        response = await_response(smart, timeout=3)
 
-        await_response(smart, timeout=1)
+        assert response is None, "Expected none, got: " + "".join(response)
 
         execute_await("Hi fellow smart guy", creator)
         execute_await("Why hello fellow smart guy", smart)
         execute_await("/quit", dumb)
-
-        DechatTestcase.write_client_lines(creator, smart, dumb)
 
     def test_message_limit(self) -> None:
         """
@@ -266,6 +272,8 @@ class BaseDechatTest(DechatTestcase):
 
         creator = DechatTestcase.create_client()
         ignorant = DechatTestcase.create_client()
+
+        self.clients = [creator, ignorant]
 
         execute_await("/nick creator", creator)
         execute_await("/nick ignorant", ignorant)
@@ -277,13 +285,13 @@ class BaseDechatTest(DechatTestcase):
         creator.feed_input("/message_limit 5")
         time.sleep(0.5)
         execute_await("You shouldn't see this", creator)
-        execute_sequence_await(["You should see this 5 times"] * 5, creator)
+        execute_sequence_await(
+            ["You should see this 5 times"] * 5, creator, period=2.5
+        )
 
         response = execute_await("/join message_limit", ignorant, period=1)
 
         assert "You shouldn't see this" not in "".join(response)
-
-        DechatTestcase.write_client_lines(creator, ignorant)
 
     def test_change_pass(self) -> None:
         """
@@ -293,6 +301,8 @@ class BaseDechatTest(DechatTestcase):
         creator = DechatTestcase.create_client()
         lucky = DechatTestcase.create_client()
         unlucky = DechatTestcase.create_client()
+
+        self.clients = [creator, lucky, unlucky]
 
         execute_await("/nick creator", creator)
         execute_await("/nick lucky", lucky)
@@ -309,15 +319,15 @@ class BaseDechatTest(DechatTestcase):
 
         creator.clear_buffer()
         execute_await("/join change_pass old_pass", unlucky)
-        await_response(creator, timeout=1)
+        response = await_response(creator, timeout=1)
+
+        assert response is None
 
         execute_await("/quit", unlucky)
 
         execute_await(
             "Hahaha look at that loser can't join the channel", lucky
         )
-
-        DechatTestcase.write_client_lines(creator, lucky, unlucky)
 
     def test_owner_joins_pass(self) -> None:
         """
@@ -326,6 +336,8 @@ class BaseDechatTest(DechatTestcase):
 
         creator = DechatTestcase.create_client()
         observer = DechatTestcase.create_client()
+
+        self.clients = [creator, observer]
 
         execute_await("/nick creator", creator)
         execute_await("/nick observer", observer)
@@ -342,9 +354,7 @@ class BaseDechatTest(DechatTestcase):
 
         response = execute_await("I am in!", creator)
 
-        assert "I am in!" in response[-1]
-
-        DechatTestcase.write_client_lines(creator, observer)
+        assert "I am in!" in response[-1], f"Got: {response[-1]}"
 
     def test_info(self) -> None:
         """
@@ -352,13 +362,15 @@ class BaseDechatTest(DechatTestcase):
         """
         client = DechatTestcase.create_client()
 
+        self.clients = [client]
+
         execute_await("/nick creator", client)
 
         DechatTestcase.connect(client, SERVERS[0])
 
-        execute_await("/info", client)
+        response = execute_await("/info", client)
 
-        DechatTestcase.write_client_lines(client)
+        assert "Server:" in "".join(response)
 
     def test_motd(self) -> None:
         """
@@ -366,13 +378,13 @@ class BaseDechatTest(DechatTestcase):
         """
         client = DechatTestcase.create_client()
 
+        self.clients = [client]
+
         execute_await("/nick creator", client)
 
         DechatTestcase.connect(client, SERVERS[0])
 
         execute_await("/motd", client)
-
-        DechatTestcase.write_client_lines(client)
 
     def test_rules(self) -> None:
         """
@@ -380,13 +392,13 @@ class BaseDechatTest(DechatTestcase):
         """
         client = DechatTestcase.create_client()
 
+        self.clients = [client]
+
         execute_await("/nick creator", client)
 
         DechatTestcase.connect(client, SERVERS[0])
 
         execute_await("/rules", client)
-
-        DechatTestcase.write_client_lines(client)
 
     def test_help(self) -> None:
         """
@@ -394,13 +406,13 @@ class BaseDechatTest(DechatTestcase):
         """
         client = DechatTestcase.create_client()
 
+        self.clients = [client]
+
         execute_await("/nick creator", client)
 
         DechatTestcase.connect(client, SERVERS[0])
 
         execute_await("/help", client)
-
-        DechatTestcase.write_client_lines(client)
 
     def test_invite(self) -> None:
         """
@@ -408,6 +420,8 @@ class BaseDechatTest(DechatTestcase):
         """
         inviter = DechatTestcase.create_client()
         invitee = DechatTestcase.create_client()
+
+        self.clients = [inviter, invitee]
 
         execute_await("/nick inviter", inviter)
         execute_await("/nick invitee", invitee)
@@ -422,9 +436,9 @@ class BaseDechatTest(DechatTestcase):
         execute_await("/quit", inviter)
         invitee.clear_buffer()
         inviter.feed_input("/invite invitee invite")
-        await_response(invitee)
+        response = await_response(invitee)
 
-        DechatTestcase.write_client_lines(inviter, invitee)
+        assert "You've been invited to" in response[-1]
 
     def test_invite_2(self) -> None:
         """
@@ -432,6 +446,8 @@ class BaseDechatTest(DechatTestcase):
         """
         inviter = DechatTestcase.create_client()
         invitee = DechatTestcase.create_client()
+
+        self.clients = [inviter, invitee]
 
         execute_await("/nick inviter", inviter)
         execute_await("/nick invitee", invitee)
@@ -453,7 +469,23 @@ class BaseDechatTest(DechatTestcase):
 
         assert response is None
 
-        DechatTestcase.write_client_lines(inviter, invitee)
+    def test_stress(self) -> None:
+        """
+        Stress tests spam
+        """
+        client = DechatTestcase.create_client()
+
+        self.clients = [client]
+
+        execute_await("/nick spammer", client)
+        DechatTestcase.connect(client, SERVERS[0])
+        execute_await("/create spam", client)
+
+        response = execute_sequence_await(
+            (["SPAM"] * 50) + ["You should see this"], client, period=5
+        )
+
+        assert "You should see this" in response[-1]
 
 
 if __name__ == "__main__":

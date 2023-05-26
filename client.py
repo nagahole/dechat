@@ -48,7 +48,7 @@ class Client:
     Client class
     """
     def __init__(self, ui_enabled: bool = False, testing_mode: bool = False,
-                 log: callable = print) -> None:
+                 log: callable = utilities.flush_print) -> None:
         """
         Purpose of the 'log' parameter is so I can use it as a hook
         to redirect output to be read instead of printed for testing
@@ -610,11 +610,10 @@ class Client:
 
                 return
 
-            else:
-                # In target server but not in any channel
-                self.smart_print_response(
-                    f"Already in target server {hostname}:{port}"
-                )
+            # In target server but not in any channel
+            self.smart_print_response(
+                f"Already in target server {hostname}:{port}"
+            )
 
         else:  # Not in server
 

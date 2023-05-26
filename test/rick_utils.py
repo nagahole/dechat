@@ -16,9 +16,9 @@ from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from client import Client
 
-DEFAULT_PERIOD = 0.2
+DEFAULT_PERIOD = 0.1
 DEFAULT_TIMEOUT = 3
-OUTPUT_FILE = "test/test_logs.txt"
+OUTPUT_FILE = "test/logs/logs.txt"
 
 SERVERS: list[tuple[str, int]] = [
     ("localhost", 9996),
@@ -198,6 +198,8 @@ class DechatTestcase(unittest.TestCase):
         """
         Setup
         """
+        self.clients: list[ClientWrapper] = []
+
         testcase_str = f"TESTCASE [{self._testMethodName}]"
 
         with open(OUTPUT_FILE, "a", encoding="ascii") as file:
@@ -209,6 +211,8 @@ class DechatTestcase(unittest.TestCase):
         """
         Destructor
         """
+        self.write_client_lines(*self.clients)
+
         with open(OUTPUT_FILE, "a", encoding="ascii") as file:
             file.write("END OF TESTCASE".center(80, "=") + "\n")
         print("END OF TESTCASE")

@@ -1,5 +1,31 @@
 # DECHAT
 
+## Test-cases
+
+### How to run test-cases
+
+I have 3 suites of test cases. One for base de-chat (no additional modules or components), one for mult-icon, and one for migration
+
+Each suite of test cases has its own makefile rule to run them
+
+- Base de-chat: "make test_base"
+- Multicon module: "make test_multicon"
+- Migration module: "make test_migration"
+
+Just be sure to run the tests with a slight gap in between them to allow the server connections to unbind
+
+### Structure of test-cases
+
+Each test case will print the executed inputs into the client as it runs them to keep track of the progress of the tests.
+
+I have added assertions for the most important parts of the test cases, meaning that if there are no raised exceptions at the end of each suite of test cases, then all of them have passed.
+
+Otherwise, if there are raised exceptions when a suite has finished running, it means there are errors.
+
+I also output the client prints of each test case for each suite in log files in test/logs for more detailed debugging and testing
+
+## Implementation
+
 My code is split into many files. However, the main files to consider are
 
 - client.py
@@ -80,27 +106,3 @@ commons.py contains important information containers and wrappers. These include
 ### Adding extra commands
 
 To add extra commands, whether on the client or server side, one can simply append to server_commands.py or client_commands.py and add the commands to the corresponding command map (a unique command map exists for each unique state of the client - for the server there is only one command map)
-
-## How to run test-cases
-
-I have 3 suites of test cases. One for base de-chat (no additional modules or components), one for mult-icon, and one for migration
-
-Each suite of test cases has its own makefile rule to run them
-
-- Base de-chat: "make test_base"
-- Multicon module: "make test_multicon"
-- Migration module: "make test_migration"
-
-Just be sure to run the tests with a slight gap in-between them to allow the server connections to unbind
-
-## Structure of test-cases
-
-Each test case will print the executed inputs into the client as it runs them to keep track of the progress of the tests.
-
-I have added assertions for the most important parts of the test cases, meaning that if there are no raised exceptions at the end of each suite of test cases, then all of them have passed.
-
-Otherwise, if there are raised exceptions when a suite has finished running, it means there are errors.
-
-However for some test-cases I have not added assertions, so they have to be checked manually through the log files
-
-I also output the client prints of each test case for each suite in log files in test/logs for more detailed debugging and testing

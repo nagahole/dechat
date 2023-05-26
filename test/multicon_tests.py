@@ -28,17 +28,19 @@ class MulticonTest(DechatTestcase):
         """
         client = DechatTestcase.create_client(ui_enabled=True)
 
+        self.clients = [client]
+
         for server in SERVERS:
             DechatTestcase.connect(client, server)
 
         for i in range(len(SERVERS)):
             execute_await(f"/display {i}", client)
             execute_await("/create hello_world", client)
-            execute_await("Hello world!", client)
+            response = execute_await("Hello world!", client)
+            assert "Hello world!" in response[-1]
 
-        execute_await("/list_displays", client)
-
-        DechatTestcase.write_client_lines(client)
+        response = execute_await("/list_displays", client)
+        assert len(response) == len(SERVERS)
 
     def test_big_display_numbers(self) -> None:
         """
@@ -49,17 +51,19 @@ class MulticonTest(DechatTestcase):
 
         client = DechatTestcase.create_client(ui_enabled=True)
 
+        self.clients = [client]
+
         for i, server in enumerate(SERVERS):
             execute_await(
                 f"/connect {server[0]}:{server[1]} {big_num + i}", client
             )
 
         for i in range(len(SERVERS)):
-            execute_await(f"/display {big_num + i}", client)
+            response = execute_await(f"/display {big_num + i}", client)
+            assert "*" in response[-1]
 
-        execute_await("/list_displays", client)
-
-        DechatTestcase.write_client_lines(client)
+        response = execute_await("/list_displays", client)
+        assert len(response) == len(SERVERS)
 
     def test_invalid_display_number(self) -> None:
         """
@@ -67,10 +71,12 @@ class MulticonTest(DechatTestcase):
         """
         client = DechatTestcase.create_client(ui_enabled=True)
 
-        execute_await(f"/connect {SERVERS[0][0]}:{SERVERS[0][1]} abc", client)
-        execute_await("/list_displays", client)
+        self.clients = [client]
 
-        DechatTestcase.write_client_lines(client)
+        execute_await(f"/connect {SERVERS[0][0]}:{SERVERS[0][1]} abc", client)
+        response = execute_await("/list_displays", client)
+
+        assert "Not connected to any server" in response[-1]
 
     def test_negative_display_number(self) -> None:
         """
@@ -78,10 +84,12 @@ class MulticonTest(DechatTestcase):
         """
         client = DechatTestcase.create_client(ui_enabled=True)
 
-        execute_await(f"/connect {SERVERS[0][0]}:{SERVERS[0][1]} -1", client)
-        execute_await("/list_displays", client)
+        self.clients = [client]
 
-        DechatTestcase.write_client_lines(client)
+        execute_await(f"/connect {SERVERS[0][0]}:{SERVERS[0][1]} -1", client)
+        response = execute_await("/list_displays", client)
+
+        assert "-1:" in response[-1]
 
     def test_list_display_channels(self) -> None:
         """
@@ -89,6 +97,8 @@ class MulticonTest(DechatTestcase):
         to
         """
         client = DechatTestcase.create_client(ui_enabled=True)
+
+        self.clients = [client]
 
         for server in SERVERS:
             DechatTestcase.connect(client, server)
@@ -101,9 +111,10 @@ class MulticonTest(DechatTestcase):
             else:
                 execute_await(f"/create channel_{i}", client)
 
-        execute_await("/list_displays", client)
+        response = "".join(execute_await("/list_displays", client))
 
-        DechatTestcase.write_client_lines(client)
+        for i in range(len(SERVERS)):
+            assert f"channel_{i}" in response
 
     def test_decimal_display_num(self) -> None:
         """
@@ -111,10 +122,12 @@ class MulticonTest(DechatTestcase):
         """
         client = DechatTestcase.create_client(ui_enabled=True)
 
-        execute_await(f"/connect {SERVERS[0][0]}:{SERVERS[0][1]} 0.5", client)
-        execute_await("/list_displays", client)
+        self.clients = [client]
 
-        DechatTestcase.write_client_lines(client)
+        execute_await(f"/connect {SERVERS[0][0]}:{SERVERS[0][1]} 0.5", client)
+        response = execute_await("/list_displays", client)
+
+        assert "Not connected to any server" in response[-1]
 
 
 if __name__ == "__main__":
